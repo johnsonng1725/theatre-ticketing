@@ -15,7 +15,7 @@ services:
       - key: ADMIN_KEY
         generateValue: true                # Render auto-generates a secure random value
       - key: CORS_ORIGINS
-        value: https://your-site.netlify.app   # ← replace with your Netlify URL
+        value: https://mckl2601theatre.netlify.app
 
 databases:
   - name: theatre-ticketing-db
