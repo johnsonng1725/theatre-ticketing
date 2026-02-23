@@ -437,8 +437,8 @@
         }
         if (!res.ok) throw new Error('Server error');
         const data = await res.json();
-        if (data.role !== 'dashboard') {
-          $('modal-error').textContent = 'Backstage requires the Admin key.';
+        if (data.role !== 'dashboard' && data.role !== 'backstage') {
+          $('modal-error').textContent = 'This key does not have backstage access.';
           $('modal-error').classList.add('visible');
           return;
         }

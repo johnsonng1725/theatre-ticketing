@@ -26,9 +26,10 @@ models.Base.metadata.create_all(bind=engine)
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-DASHBOARD_KEY    = os.environ.get("DASHBOARD_KEY", "admin321")
-FINANCE_KEY      = os.environ.get("FINANCE_KEY",   "finance123")
-SCANNER_KEY      = os.environ.get("SCANNER_KEY",   "admin123")
+DASHBOARD_KEY    = os.environ.get("DASHBOARD_KEY",  "admin321")
+FINANCE_KEY      = os.environ.get("FINANCE_KEY",    "finance123")
+SCANNER_KEY      = os.environ.get("SCANNER_KEY",    "admin123")
+BACKSTAGE_KEY    = os.environ.get("BACKSTAGE_KEY",  "admin")
 _raw_origins     = os.environ.get("CORS_ORIGINS", "*")
 CORS_ORIGINS     = [o.strip() for o in _raw_origins.split(",")] if _raw_origins != "*" else ["*"]
 
@@ -328,6 +329,11 @@ def verify_dashboard(x_admin_key: str = Header(..., alias="X-Admin-Key")):
     if x_admin_key != DASHBOARD_KEY:
         raise HTTPException(status_code=401, detail="Invalid dashboard key")
 
+def verify_backstage(x_admin_key: str = Header(..., alias="X-Admin-Key")):
+    """Audit log access — accepts dashboard key or dedicated backstage key."""
+    if x_admin_key not in (DASHBOARD_KEY, BACKSTAGE_KEY):
+        raise HTTPException(status_code=401, detail="Invalid key")
+
 def verify_any_admin(x_admin_key: str = Header(..., alias="X-Admin-Key")):
     """Read-only admin access — accepts dashboard, finance, and scanner keys."""
     if x_admin_key not in (DASHBOARD_KEY, FINANCE_KEY, SCANNER_KEY):
@@ -363,6 +369,9 @@ def admin_ping(
     if x_admin_key == SCANNER_KEY:
         _log_action(db, "Scanner", "login", "Logged in as Scanner (view only)")
         return {"ok": True, "role": "finance"}   # scanner key gets read-only dashboard access
+    if x_admin_key == BACKSTAGE_KEY:
+        _log_action(db, "Admin", "login", "Logged in to Backstage")
+        return {"ok": True, "role": "backstage"}
     raise HTTPException(status_code=401, detail="Invalid key")
 
 
@@ -679,7 +688,7 @@ def checkin_ticket(
 
 @app.get(
     "/api/admin/audit",
-    dependencies=[Depends(verify_dashboard)],
+    dependencies=[Depends(verify_backstage)],
 )
 def get_audit_log(db: Session = Depends(get_db), limit: int = 200):
     """Return the most recent audit log entries (dashboard key required)."""
