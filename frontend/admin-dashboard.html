@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard — Immersive Theatre</title>
+
+  <style>
+    /* ── Design tokens ──────────────────────────────────────── */
+    :root {
+      --bg:        #0a0a0f;
+      --surface:   #12121e;
+      --card:      #1a1a2e;
+      --border:    #2a2a45;
+      --gold:      #d4af37;
+      --gold-dim:  #a8892a;
+      --purple:    #8b5cf6;
+      --text:      #e8e8f0;
+      --text-muted:#8888aa;
+      --success:   #10b981;
+      --warning:   #f59e0b;
+      --error:     #ef4444;
+      --radius:    12px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Top nav ────────────────────────────────────────────── */
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .nav-brand .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--gold);
+      box-shadow: 0 0 8px var(--gold);
+    }
+    .nav-brand span {
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: 0.04em;
+      color: var(--gold);
+    }
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      padding: 0.4rem 0.7rem;
+      border-radius: 6px;
+      transition: color 0.2s, background 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); background: var(--card); }
+
+    /* Live indicator */
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.75rem;
+      color: var(--success);
+      background: rgba(16,185,129,0.1);
+      border: 1px solid rgba(16,185,129,0.3);
+      padding: 0.3rem 0.7rem;
+      border-radius: 999px;
+    }
+    .live-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+    .live-badge.stale { color: var(--error); background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); }
+    .live-badge.stale .live-dot { background: var(--error); animation: none; }
+
+    /* ── Main content ───────────────────────────────────────── */
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    .page-title {
+      margin-bottom: 2rem;
+    }
+    .page-title h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+    }
+    .page-title p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-top: 0.3rem;
+    }
+
+    /* ── Stats grid ─────────────────────────────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+    }
+    .stat-card.total::before   { background: var(--purple); }
+    .stat-card.checkedin::before { background: var(--success); }
+    .stat-card.remaining::before { background: var(--warning); }
+
+    .stat-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+      margin-bottom: 0.6rem;
+    }
+    .stat-value {
+      font-size: 2.4rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .stat-card.total    .stat-value { color: var(--purple); }
+    .stat-card.checkedin .stat-value { color: var(--success); }
+    .stat-card.remaining .stat-value { color: var(--warning); }
+
+    .stat-sub {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.4rem;
+    }
+
+    /* ── Progress bar ───────────────────────────────────────── */
+    .progress-wrap {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+    }
+    .progress-bar-bg {
+      background: var(--border);
+      border-radius: 999px;
+      height: 10px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--success), #34d399);
+      transition: width 0.6s ease;
+      width: 0%;
+    }
+
+    /* ── Table wrapper ──────────────────────────────────────── */
+    .table-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .table-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .table-header h2 { font-size: 1rem; font-weight: 600; }
+
+    /* Search */
+    .search-box {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.45rem 0.75rem;
+    }
+    .search-box svg { color: var(--text-muted); flex-shrink: 0; }
+    .search-box input {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 0.9rem;
+      width: 180px;
+    }
+    .search-box input::placeholder { color: var(--text-muted); }
+
+    .table-scroll { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+    thead th {
+      background: var(--surface);
+      padding: 0.75rem 1.25rem;
+      text-align: left;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    tbody tr {
+      border-top: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+    tbody tr:hover { background: rgba(255,255,255,0.02); }
+    td {
+      padding: 0.9rem 1.25rem;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    /* Status badge */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge.in   { background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3); }
+    .badge.out  { background: rgba(136,136,170,0.1);  color: var(--text-muted); border: 1px solid var(--border); }
+    .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+    /* Ticket type chip */
+    .type-chip {
+      background: rgba(139,92,246,0.15);
+      color: var(--purple);
+      border: 1px solid rgba(139,92,246,0.3);
+      border-radius: 999px;
+      padding: 0.2rem 0.6rem;
+      font-size: 0.75rem;
+      white-space: nowrap;
+    }
+    .type-chip.vip   { background: rgba(212,175,55,0.15); color: var(--gold); border-color: rgba(212,175,55,0.3); }
+
+    .ticket-id-cell {
+      font-family: monospace;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      max-width: 150px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Payment status badge */
+    .badge.paid    { background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3); }
+    .badge.pending { background: rgba(245,158,11,0.12); color: var(--warning); border: 1px solid rgba(245,158,11,0.35); }
+
+    /* Receipt view button */
+    .btn-receipt {
+      background: rgba(139,92,246,0.15);
+      color: var(--purple);
+      border: 1px solid rgba(139,92,246,0.3);
+      border-radius: 6px;
+      padding: 0.25rem 0.65rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-receipt:hover { background: rgba(139,92,246,0.28); }
+
+    /* ── Receipt modal ──────────────────────────────────────── */
+    #receipt-modal {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.88);
+      backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 200; padding: 1.5rem;
+    }
+    #receipt-modal.hidden { display: none; }
+    .receipt-modal-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 24px 64px rgba(0,0,0,0.8);
+      max-width: 560px; width: 100%;
+      overflow: hidden;
+    }
+    .receipt-modal-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .receipt-modal-head h3 { font-size: 0.95rem; font-weight: 600; }
+    .receipt-modal-head button {
+      background: transparent; border: none; color: var(--text-muted);
+      font-size: 1.2rem; cursor: pointer; padding: 0.2rem;
+    }
+    .receipt-modal-head button:hover { color: var(--text); }
+    .receipt-modal-body {
+      padding: 1.25rem; display: flex; justify-content: center; align-items: center;
+      min-height: 200px;
+    }
+    #receipt-modal-img {
+      max-width: 100%; max-height: 60vh;
+      border-radius: 8px; object-fit: contain;
+    }
+    .receipt-modal-loading { color: var(--text-muted); font-size: 0.9rem; }
+    .receipt-modal-foot {
+      padding: 0.85rem 1.25rem;
+      border-top: 1px solid var(--border);
+      display: flex; gap: 0.75rem; justify-content: flex-end;
+    }
+    .btn-receipt-dl {
+      background: var(--gold); color: #0a0a0f;
+      border: none; border-radius: 7px;
+      padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 700;
+      cursor: pointer; text-decoration: none;
+    }
+    .btn-receipt-dl:hover { opacity: 0.9; }
+    .btn-receipt-close {
+      background: transparent; color: var(--text-muted);
+      border: 1px solid var(--border); border-radius: 7px;
+      padding: 0.5rem 1rem; font-size: 0.85rem; cursor: pointer;
+    }
+    .btn-receipt-close:hover { color: var(--text); }
+
+    /* Empty / loading states */
+    .table-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-muted);
+    }
+    .table-state p { margin-top: 0.5rem; font-size: 0.9rem; }
+
+    /* ── Error banner ───────────────────────────────────────── */
+    #error-banner {
+      display: none;
+      background: rgba(239,68,68,0.1);
+      border: 1px solid var(--error);
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      color: var(--error);
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+    }
+    #error-banner.visible { display: block; }
+
+    /* ── Login modal ────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 1rem;
+    }
+    .modal-overlay.hidden { display: none; }
+
+    .modal {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2rem;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.8);
+    }
+    .modal-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+    }
+    .modal-sub {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+    }
+    .modal label {
+      display: block;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.4rem;
+    }
+    .modal input {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 1rem;
+      padding: 0.75rem 1rem;
+      outline: none;
+      margin-bottom: 0.75rem;
+    }
+    .modal input:focus { border-color: var(--gold); }
+    .modal-error {
+      color: var(--error);
+      font-size: 0.82rem;
+      margin-bottom: 0.75rem;
+      display: none;
+    }
+    .modal-error.visible { display: block; }
+    .btn-modal {
+      width: 100%;
+      padding: 0.8rem;
+      background: var(--gold);
+      border: none;
+      border-radius: 8px;
+      color: #0a0a0f;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+    .btn-modal:hover { opacity: 0.9; }
+
+    /* ── Settings button in nav ─────────────────────────────── */
+    .btn-settings {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-muted);
+      font-size: 1rem;
+      padding: 0.3rem 0.65rem;
+      cursor: pointer;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .btn-settings:hover { color: var(--gold); border-color: var(--gold); }
+
+    /* ── Settings modal ─────────────────────────────────────── */
+    #settings-modal {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.88);
+      backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 400; padding: 1.5rem;
+      overflow-y: auto;
+    }
+    #settings-modal.hidden { display: none; }
+    .settings-modal-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 24px 64px rgba(0,0,0,0.8);
+      max-width: 580px; width: 100%;
+      overflow: hidden;
+      margin: auto;
+    }
+    .settings-modal-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .settings-modal-head h3 { font-size: 0.95rem; font-weight: 600; }
+    .settings-modal-head button {
+      background: transparent; border: none; color: var(--text-muted);
+      font-size: 1.2rem; cursor: pointer;
+    }
+    .settings-modal-head button:hover { color: var(--text); }
+    .settings-section {
+      padding: 1rem 1.25rem 0;
+    }
+    .settings-section-title {
+      font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.14em;
+      color: var(--gold); margin-bottom: 0.85rem;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .settings-section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    .settings-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem 1rem;
+      margin-bottom: 1rem;
+    }
+    .settings-field { display: flex; flex-direction: column; gap: 0.3rem; }
+    .settings-field.full { grid-column: 1 / -1; }
+    .settings-field label {
+      font-size: 0.72rem; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--text-muted);
+    }
+    .settings-field input,
+    .settings-field textarea {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--text);
+      font-size: 0.9rem;
+      padding: 0.55rem 0.8rem;
+      outline: none;
+      width: 100%;
+      font-family: inherit;
+    }
+    .settings-field textarea { resize: vertical; min-height: 64px; }
+    .settings-field input:focus,
+    .settings-field textarea:focus { border-color: var(--gold); }
+    .settings-field .field-hint {
+      font-size: 0.72rem; color: var(--text-muted);
+    }
+    .settings-modal-error {
+      margin: 0 1.25rem 0.5rem;
+      color: var(--error); font-size: 0.82rem; display: none;
+    }
+    .settings-modal-error.visible { display: block; }
+    .settings-modal-foot {
+      padding: 0.85rem 1.25rem;
+      border-top: 1px solid var(--border);
+      display: flex; gap: 0.75rem; justify-content: flex-end;
+    }
+    .btn-save-settings {
+      background: var(--gold); color: #0a0a0f;
+      border: none; border-radius: 7px;
+      padding: 0.55rem 1.2rem; font-size: 0.88rem; font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-save-settings:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn-save-settings:not(:disabled):hover { opacity: 0.9; }
+    .btn-cancel-settings {
+      background: transparent; color: var(--text-muted);
+      border: 1px solid var(--border); border-radius: 7px;
+      padding: 0.55rem 1rem; font-size: 0.88rem; cursor: pointer;
+    }
+    .btn-cancel-settings:hover { color: var(--text); }
+    .settings-saved-msg {
+      color: var(--success); font-size: 0.82rem; margin-right: auto;
+      display: none; align-items: center; gap: 0.3rem;
+    }
+    .settings-saved-msg.visible { display: flex; }
+
+    /* ── Edit button ────────────────────────────────────────── */
+    .btn-edit {
+      background: rgba(212,175,55,0.12);
+      color: var(--gold);
+      border: 1px solid rgba(212,175,55,0.35);
+      border-radius: 6px;
+      padding: 0.25rem 0.65rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-edit:hover { background: rgba(212,175,55,0.25); }
+
+    /* ── Delete button ──────────────────────────────────────── */
+    .btn-delete {
+      background: rgba(239,68,68,0.1);
+      color: var(--error);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 6px;
+      padding: 0.25rem 0.65rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-delete:hover { background: rgba(239,68,68,0.22); }
+
+    /* ── Delete confirm modal ───────────────────────────────── */
+    #delete-modal {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.88);
+      backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 500; padding: 1.5rem;
+    }
+    #delete-modal.hidden { display: none; }
+    .delete-modal-box {
+      background: var(--card);
+      border: 1px solid rgba(239,68,68,0.35);
+      border-radius: var(--radius);
+      box-shadow: 0 24px 64px rgba(0,0,0,0.8);
+      max-width: 400px; width: 100%;
+      overflow: hidden;
+    }
+    .delete-modal-head {
+      padding: 1.25rem 1.25rem 0;
+    }
+    .delete-modal-head h3 {
+      font-size: 1rem; font-weight: 700; color: var(--error);
+      margin-bottom: 0.5rem;
+    }
+    .delete-modal-head p {
+      font-size: 0.875rem; color: var(--text-muted); line-height: 1.5;
+    }
+    .delete-modal-head p strong { color: var(--text); }
+    .delete-modal-foot {
+      padding: 1.25rem;
+      display: flex; gap: 0.75rem; justify-content: flex-end;
+    }
+    .btn-confirm-delete {
+      background: var(--error); color: #fff;
+      border: none; border-radius: 7px;
+      padding: 0.55rem 1.2rem; font-size: 0.88rem; font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-confirm-delete:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn-confirm-delete:not(:disabled):hover { opacity: 0.85; }
+    .btn-cancel-delete {
+      background: transparent; color: var(--text-muted);
+      border: 1px solid var(--border); border-radius: 7px;
+      padding: 0.55rem 1rem; font-size: 0.88rem; cursor: pointer;
+    }
+    .btn-cancel-delete:hover { color: var(--text); }
+
+    /* ── Edit modal ─────────────────────────────────────────── */
+    #edit-modal {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.88);
+      backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 300; padding: 1.5rem;
+    }
+    #edit-modal.hidden { display: none; }
+    .edit-modal-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 24px 64px rgba(0,0,0,0.8);
+      max-width: 520px; width: 100%;
+      overflow: hidden;
+    }
+    .edit-modal-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .edit-modal-head h3 { font-size: 0.95rem; font-weight: 600; }
+    .edit-modal-head button {
+      background: transparent; border: none; color: var(--text-muted);
+      font-size: 1.2rem; cursor: pointer;
+    }
+    .edit-modal-head button:hover { color: var(--text); }
+    .edit-modal-body {
+      padding: 1.25rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.85rem 1rem;
+    }
+    .edit-field { display: flex; flex-direction: column; gap: 0.3rem; }
+    .edit-field.full { grid-column: 1 / -1; }
+    .edit-field label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+    .edit-field input,
+    .edit-field select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--text);
+      font-size: 0.9rem;
+      padding: 0.55rem 0.8rem;
+      outline: none;
+      width: 100%;
+    }
+    .edit-field input:focus,
+    .edit-field select:focus { border-color: var(--gold); }
+    .edit-field select option { background: var(--surface); }
+    .edit-modal-error {
+      margin: 0 1.25rem 0.5rem;
+      color: var(--error);
+      font-size: 0.82rem;
+      display: none;
+    }
+    .edit-modal-error.visible { display: block; }
+    .edit-modal-foot {
+      padding: 0.85rem 1.25rem;
+      border-top: 1px solid var(--border);
+      display: flex; gap: 0.75rem; justify-content: flex-end;
+    }
+    .btn-save {
+      background: var(--gold); color: #0a0a0f;
+      border: none; border-radius: 7px;
+      padding: 0.55rem 1.2rem; font-size: 0.88rem; font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-save:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn-save:not(:disabled):hover { opacity: 0.9; }
+    .btn-cancel-edit {
+      background: transparent; color: var(--text-muted);
+      border: 1px solid var(--border); border-radius: 7px;
+      padding: 0.55rem 1rem; font-size: 0.88rem; cursor: pointer;
+    }
+    .btn-cancel-edit:hover { color: var(--text); }
+
+    /* ── Misc ───────────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .table-header { flex-direction: column; align-items: flex-start; }
+      .nav-links { display: none; }
+      .edit-modal-body { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Admin key login modal ──────────────────────────────── -->
+  <div class="modal-overlay" id="login-modal">
+    <div class="modal">
+      <p class="modal-title">Admin Access</p>
+      <p class="modal-sub">Enter your admin key to view the dashboard.</p>
+      <label for="modal-key">Admin Key</label>
+      <input
+        type="password"
+        id="modal-key"
+        placeholder="Paste your admin key…"
+        autocomplete="off"
+      />
+      <p class="modal-error" id="modal-error">Incorrect key — please try again.</p>
+      <button class="btn-modal" id="modal-submit">Unlock Dashboard</button>
+    </div>
+  </div>
+
+  <!-- ── Navigation ─────────────────────────────────────────── -->
+  <nav>
+    <div class="nav-brand">
+      <div class="dot"></div>
+      <span>Theatre Admin</span>
+    </div>
+    <div class="nav-right">
+      <div class="nav-links">
+        <a href="index.html">Registration</a>
+        <a href="admin-scanner.html">Scanner</a>
+      </div>
+      <button class="btn-settings" onclick="openSettingsModal()" title="Event Settings">⚙️</button>
+      <div class="live-badge" id="live-badge">
+        <div class="live-dot"></div>
+        <span id="live-text">Live</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Main ───────────────────────────────────────────────── -->
+  <main>
+
+    <div class="page-title">
+      <h1>Audience Dashboard</h1>
+      <p id="last-refresh">Fetching data…</p>
+    </div>
+
+    <div id="error-banner"></div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card total">
+        <p class="stat-label">Total Tickets</p>
+        <p class="stat-value" id="stat-total-tickets">—</p>
+        <p class="stat-sub" id="stat-registrations-sub">— registrations</p>
+      </div>
+      <div class="stat-card checkedin">
+        <p class="stat-label">Checked In</p>
+        <p class="stat-value" id="stat-checkedin">—</p>
+        <p class="stat-sub">groups present</p>
+      </div>
+      <div class="stat-card remaining">
+        <p class="stat-label">Yet to Arrive</p>
+        <p class="stat-value" id="stat-remaining">—</p>
+        <p class="stat-sub">expected</p>
+      </div>
+    </div>
+
+    <!-- Check-in progress -->
+    <div class="progress-wrap">
+      <div class="progress-header">
+        <span>Check-in Progress</span>
+        <span id="progress-pct">0%</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progress-fill"></div>
+      </div>
+    </div>
+
+    <!-- Ticket table -->
+    <div class="table-card">
+      <div class="table-header">
+        <h2>All Tickets</h2>
+        <div class="search-box">
+          <!-- Search icon -->
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+          </svg>
+          <input
+            type="text"
+            id="search-input"
+            placeholder="Search name or email…"
+          />
+        </div>
+      </div>
+
+      <div class="table-scroll">
+        <table id="tickets-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Type</th>
+              <th>Qty</th>
+              <th>Show Date</th>
+              <th>Payment</th>
+              <th>Receipt</th>
+              <th>Check-In</th>
+              <th>Checked In At</th>
+              <th>Ticket ID</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tickets-tbody">
+            <tr>
+              <td colspan="12">
+                <div class="table-state">
+                  <p>Loading tickets…</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ── Receipt modal ──────────────────────────────────────── -->
+  <div id="receipt-modal" class="hidden">
+    <div class="receipt-modal-box">
+      <div class="receipt-modal-head">
+        <h3 id="receipt-modal-title">Payment Receipt</h3>
+        <button onclick="closeReceiptModal()" title="Close">✕</button>
+      </div>
+      <div class="receipt-modal-body">
+        <span class="receipt-modal-loading" id="receipt-loading">Loading receipt…</span>
+        <img id="receipt-modal-img" src="" alt="Receipt" style="display:none" />
+      </div>
+      <div class="receipt-modal-foot">
+        <a id="receipt-download-link" class="btn-receipt-dl" download="receipt.jpg" style="display:none">
+          Download
+        </a>
+        <button class="btn-receipt-close" onclick="closeReceiptModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Settings modal ────────────────────────────────────────── -->
+  <div id="settings-modal" class="hidden">
+    <div class="settings-modal-box">
+      <div class="settings-modal-head">
+        <h3>⚙️ Event Settings</h3>
+        <button onclick="closeSettingsModal()" title="Close">✕</button>
+      </div>
+
+      <!-- Event Info -->
+      <div class="settings-section">
+        <p class="settings-section-title">Event Info</p>
+        <div class="settings-grid">
+          <div class="settings-field full">
+            <label for="s-event-name">Event Name (shown at top of page)</label>
+            <input id="s-event-name" type="text" placeholder="e.g. Immersive Theatre Experience" />
+          </div>
+          <div class="settings-field full">
+            <label for="s-event-subtitle">Page Title (big heading)</label>
+            <input id="s-event-subtitle" type="text" placeholder="e.g. Reserve Your Place" />
+          </div>
+          <div class="settings-field full">
+            <label for="s-event-desc">Page Description (sub-text)</label>
+            <textarea id="s-event-desc" placeholder="e.g. Complete the form, pay, and upload your receipt…"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Show Dates -->
+      <div class="settings-section">
+        <p class="settings-section-title">Show Dates</p>
+        <div class="settings-grid">
+          <div class="settings-field full">
+            <label for="s-show-dates">Show Dates</label>
+            <input id="s-show-dates" type="text" placeholder="e.g. 2026-04-19,2026-04-26" />
+            <span class="field-hint">Comma-separated dates in YYYY-MM-DD format. E.g. 2026-04-19,2026-04-26</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ticket Pricing -->
+      <div class="settings-section">
+        <p class="settings-section-title">Ticket Pricing & Limits</p>
+        <div class="settings-grid">
+          <div class="settings-field">
+            <label for="s-eb-price">Early Bird Price (RM)</label>
+            <input id="s-eb-price" type="number" min="0" placeholder="e.g. 25" />
+          </div>
+          <div class="settings-field">
+            <label for="s-std-price">Standard Price (RM)</label>
+            <input id="s-std-price" type="number" min="0" placeholder="e.g. 30" />
+          </div>
+          <div class="settings-field">
+            <label for="s-eb-limit">Early Bird Limit (per show date)</label>
+            <input id="s-eb-limit" type="number" min="1" placeholder="e.g. 30" />
+          </div>
+        </div>
+      </div>
+
+      <!-- DuitNow -->
+      <div class="settings-section">
+        <p class="settings-section-title">DuitNow Payment Details</p>
+        <div class="settings-grid">
+          <div class="settings-field full">
+            <label for="s-duitnow-name">Account Name</label>
+            <input id="s-duitnow-name" type="text" placeholder="e.g. Jane Doe / XYZ Theatre Co." />
+          </div>
+          <div class="settings-field full">
+            <label for="s-duitnow-id">DuitNow ID (phone / IC / business reg)</label>
+            <input id="s-duitnow-id" type="text" placeholder="e.g. 012-345 6789" />
+          </div>
+        </div>
+      </div>
+
+      <p class="settings-modal-error" id="settings-modal-error"></p>
+      <div class="settings-modal-foot">
+        <span class="settings-saved-msg" id="settings-saved-msg">✓ Saved!</span>
+        <button class="btn-cancel-settings" onclick="closeSettingsModal()">Cancel</button>
+        <button class="btn-save-settings" id="btn-save-settings" onclick="saveSettings()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Edit ticket modal ──────────────────────────────────── -->
+  <div id="edit-modal" class="hidden">
+    <div class="edit-modal-box">
+      <div class="edit-modal-head">
+        <h3>Edit Registration</h3>
+        <button onclick="closeEditModal()" title="Close">✕</button>
+      </div>
+      <div class="edit-modal-body">
+        <div class="edit-field">
+          <label for="edit-name">Full Name</label>
+          <input id="edit-name" type="text" placeholder="Full name" />
+        </div>
+        <div class="edit-field">
+          <label for="edit-phone">Phone</label>
+          <input id="edit-phone" type="text" placeholder="Phone number" />
+        </div>
+        <div class="edit-field full">
+          <label for="edit-email">Email</label>
+          <input id="edit-email" type="email" placeholder="Email address" />
+        </div>
+        <div class="edit-field">
+          <label for="edit-ticket-type">Ticket Type</label>
+          <select id="edit-ticket-type">
+            <option value="Early Bird">Early Bird</option>
+            <option value="Standard">Standard</option>
+          </select>
+        </div>
+        <div class="edit-field">
+          <label for="edit-show-date">Show Date</label>
+          <select id="edit-show-date">
+            <option value="2026-04-19">19 Apr 2026 (Sun)</option>
+            <option value="2026-04-26">26 Apr 2026 (Sun)</option>
+          </select>
+        </div>
+        <div class="edit-field">
+          <label for="edit-quantity">Quantity</label>
+          <input id="edit-quantity" type="number" min="1" max="10" />
+        </div>
+        <div class="edit-field">
+          <label for="edit-payment-status">Payment Status</label>
+          <select id="edit-payment-status">
+            <option value="pending">Pending</option>
+            <option value="receipt_uploaded">Receipt Uploaded</option>
+          </select>
+        </div>
+      </div>
+      <p class="edit-modal-error" id="edit-modal-error"></p>
+      <div class="edit-modal-foot">
+        <button class="btn-cancel-edit" onclick="closeEditModal()">Cancel</button>
+        <button class="btn-save" id="btn-save-edit" onclick="saveEdit()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Delete confirm modal ───────────────────────────────── -->
+  <div id="delete-modal" class="hidden">
+    <div class="delete-modal-box">
+      <div class="delete-modal-head">
+        <h3>🗑 Delete Ticket?</h3>
+        <p>You are about to permanently delete the registration for <strong id="delete-modal-name"></strong>.<br>This action cannot be undone.</p>
+      </div>
+      <div class="delete-modal-foot">
+        <button class="btn-cancel-delete" onclick="closeDeleteModal()">Cancel</button>
+        <button class="btn-confirm-delete" id="btn-confirm-delete" onclick="confirmDelete()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./config.js"></script>
+  <script>
+    // API_BASE is defined in config.js — edit that file to change the backend URL.
+    const REFRESH_MS     = 5000; // auto-refresh interval
+    const SESSION_KEY    = 'theatre_dashboard_key';
+
+    // ── State ────────────────────────────────────────────────
+    let adminKey   = sessionStorage.getItem(SESSION_KEY) || '';
+    let allTickets = [];
+    let refreshTimer;
+
+    // ── Helpers ──────────────────────────────────────────────
+    const $ = id => document.getElementById(id);
+
+    function showError(msg) {
+      const el = $('error-banner');
+      el.textContent = msg;
+      el.classList.add('visible');
+    }
+    function clearError() {
+      $('error-banner').classList.remove('visible');
+    }
+
+    function setLive(ok) {
+      const badge = $('live-badge');
+      const text  = $('live-text');
+      if (ok) {
+        badge.classList.remove('stale');
+        text.textContent = 'Live';
+      } else {
+        badge.classList.add('stale');
+        text.textContent = 'Stale';
+      }
+    }
+
+    function parseApiError(data) {
+      if (!data) return 'An unexpected error occurred.';
+      const d = data.detail;
+      if (!d) return 'An unexpected error occurred.';
+      if (typeof d === 'string') return d;
+      if (Array.isArray(d)) {
+        return d.map(e => {
+          const field = e.loc ? e.loc.slice(-1)[0] : '';
+          return field ? `${field}: ${e.msg}` : e.msg;
+        }).join(' · ');
+      }
+      return JSON.stringify(d);
+    }
+
+    function formatDateTime(iso) {
+      if (!iso) return '—';
+      return new Date(iso).toLocaleString('en-GB', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+    }
+
+    function formatDate(iso) {
+      const d = new Date(iso + 'T00:00:00');
+      return d.toLocaleDateString('en-GB', {
+        day: 'numeric', month: 'short', year: 'numeric'
+      });
+    }
+
+    // ── Login modal ──────────────────────────────────────────
+    function maybeShowLogin() {
+      if (!adminKey) {
+        $('login-modal').classList.remove('hidden');
+      } else {
+        $('login-modal').classList.add('hidden');
+        startDashboard();
+      }
+    }
+
+    $('modal-submit').addEventListener('click', attemptLogin);
+    $('modal-key').addEventListener('keydown', e => {
+      if (e.key === 'Enter') attemptLogin();
+    });
+
+    async function attemptLogin() {
+      const key = $('modal-key').value.trim();
+      if (!key) return;
+
+      // Verify key — must be the dashboard key, not the scanner key
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/ping`, {
+          headers: { 'X-Admin-Key': key }
+        });
+        if (res.status === 401) {
+          $('modal-error').textContent = 'Incorrect key — please try again.';
+          $('modal-error').classList.add('visible');
+          return;
+        }
+        if (!res.ok) throw new Error('Server error');
+        const data = await res.json();
+        if (data.role !== 'dashboard') {
+          $('modal-error').textContent = 'This key does not have dashboard access.';
+          $('modal-error').classList.add('visible');
+          return;
+        }
+        adminKey = key;
+        sessionStorage.setItem(SESSION_KEY, key);
+        $('modal-error').classList.remove('visible');
+        $('login-modal').classList.add('hidden');
+        startDashboard();
+      } catch {
+        $('modal-error').textContent = 'Could not reach the server. Check your network.';
+        $('modal-error').classList.add('visible');
+      }
+    }
+
+    // ── Dashboard ────────────────────────────────────────────
+    function startDashboard() {
+      fetchTickets();
+      refreshTimer = setInterval(fetchTickets, REFRESH_MS);
+    }
+
+    async function fetchTickets() {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/tickets`, {
+          headers: { 'X-Admin-Key': adminKey }
+        });
+
+        if (res.status === 401) {
+          // Key expired / invalid — force re-login
+          clearInterval(refreshTimer);
+          sessionStorage.removeItem(SESSION_KEY);
+          adminKey = '';
+          $('login-modal').classList.remove('hidden');
+          return;
+        }
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+        clearError();
+        setLive(true);
+        allTickets = data.tickets;
+        updateStats(data.total, data.total_tickets, data.checked_in);
+        renderTable($('search-input').value.trim().toLowerCase());
+        $('last-refresh').textContent = `Last updated: ${new Date().toLocaleTimeString('en-GB')}`;
+
+      } catch (err) {
+        console.error(err);
+        showError('Failed to fetch ticket data. Retrying…');
+        setLive(false);
+      }
+    }
+
+    // ── Stats ────────────────────────────────────────────────
+    function updateStats(total, totalTickets, checkedIn) {
+      const remaining = total - checkedIn;
+      const pct = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
+
+      $('stat-total-tickets').textContent      = totalTickets;
+      $('stat-registrations-sub').textContent  = `${total} registration${total !== 1 ? 's' : ''}`;
+      $('stat-checkedin').textContent          = checkedIn;
+      $('stat-remaining').textContent          = remaining;
+      $('progress-pct').textContent            = `${pct}%`;
+      $('progress-fill').style.width           = `${pct}%`;
+    }
+
+    // ── Table rendering ──────────────────────────────────────
+    function renderTable(query) {
+      const tbody  = $('tickets-tbody');
+      const filtered = query
+        ? allTickets.filter(t =>
+            t.name.toLowerCase().includes(query) ||
+            t.email.toLowerCase().includes(query)
+          )
+        : allTickets;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="12"><div class="table-state">
+          <p>${query ? 'No tickets match your search.' : 'No tickets registered yet.'}</p>
+        </div></td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(t => {
+        const isEB   = t.ticket_type === 'Early Bird';
+        const isVIP  = t.ticket_type.toLowerCase() === 'vip';
+        const typeClass = isEB ? ' vip' : (isVIP ? ' vip' : '');
+
+        const checkinBadge = t.checked_in
+          ? `<span class="badge in"><span class="badge-dot"></span>Checked In</span>`
+          : `<span class="badge out"><span class="badge-dot"></span>Pending</span>`;
+
+        const paymentBadge = t.payment_status === 'receipt_uploaded'
+          ? `<span class="badge paid"><span class="badge-dot"></span>Receipt</span>`
+          : `<span class="badge pending"><span class="badge-dot"></span>Pending</span>`;
+
+        const receiptBtn = t.receipt_filename
+          ? `<button class="btn-receipt" onclick="viewReceipt('${escape(t.ticket_id)}', '${escape(t.receipt_filename)}')">View</button>`
+          : `<span style="color:var(--text-muted);font-size:0.78rem">—</span>`;
+
+        const typeChip = `<span class="type-chip${typeClass}">${escape(t.ticket_type)}</span>`;
+
+        const actionBtns = `
+          <button class="btn-edit"   onclick="openEditModal('${escape(t.ticket_id)}')">Edit</button>
+          <button class="btn-delete" onclick="openDeleteModal('${escape(t.ticket_id)}', '${escape(t.name)}')">Delete</button>`;
+
+        return `<tr>
+          <td>${escape(t.name)}</td>
+          <td>${escape(t.email)}</td>
+          <td>${typeChip}</td>
+          <td style="text-align:center">${t.quantity ?? 1}</td>
+          <td>${formatDate(t.show_date)}</td>
+          <td>${paymentBadge}</td>
+          <td>${receiptBtn}</td>
+          <td>${checkinBadge}</td>
+          <td>${formatDateTime(t.checked_in_at)}</td>
+          <td class="ticket-id-cell" title="${escape(t.ticket_id)}">${escape(t.ticket_id)}</td>
+          <td style="white-space:nowrap;display:flex;gap:0.4rem;">${actionBtns}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // ── Receipt modal ─────────────────────────────────────────
+    async function viewReceipt(ticketId, filename) {
+      const modal   = $('receipt-modal');
+      const img     = $('receipt-modal-img');
+      const loading = $('receipt-loading');
+      const dlLink  = $('receipt-download-link');
+
+      $('receipt-modal-title').textContent = `Receipt — ${filename}`;
+      img.style.display     = 'none';
+      dlLink.style.display  = 'none';
+      loading.textContent   = 'Loading receipt…';
+      loading.style.display = '';
+      modal.classList.remove('hidden');
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/receipt/${ticketId}`, {
+          headers: { 'X-Admin-Key': adminKey }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        loading.style.display = 'none';
+        img.src = data.receipt_data;
+        img.style.display = 'block';
+
+        dlLink.href = data.receipt_data;
+        dlLink.download = data.receipt_filename || 'receipt';
+        dlLink.style.display = '';
+      } catch (err) {
+        loading.textContent = 'Could not load receipt. ' + err.message;
+      }
+    }
+
+    function closeReceiptModal() {
+      $('receipt-modal').classList.add('hidden');
+      $('receipt-modal-img').src = '';
+    }
+
+    // Close modal on backdrop click
+    $('receipt-modal').addEventListener('click', e => {
+      if (e.target === $('receipt-modal')) closeReceiptModal();
+    });
+
+    // Basic HTML escape to prevent XSS
+    function escape(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // ── Settings modal ───────────────────────────────────────
+    async function openSettingsModal() {
+      // Load current settings from API
+      try {
+        const res = await fetch(`${API_BASE}/api/settings`);
+        const s   = res.ok ? await res.json() : {};
+
+        $('s-event-name').value     = s.event_name        || '';
+        $('s-event-subtitle').value = s.event_subtitle    || '';
+        $('s-event-desc').value     = s.event_description || '';
+        $('s-show-dates').value     = s.show_dates        || '';
+        $('s-eb-price').value       = s.early_bird_price  || '';
+        $('s-std-price').value      = s.standard_price    || '';
+        $('s-eb-limit').value       = s.early_bird_limit  || '';
+        $('s-duitnow-name').value   = s.duitnow_name      || '';
+        $('s-duitnow-id').value     = s.duitnow_id        || '';
+      } catch {
+        // Leave fields blank — user can still fill them in
+      }
+      $('settings-modal-error').classList.remove('visible');
+      $('settings-saved-msg').classList.remove('visible');
+      $('btn-save-settings').disabled = false;
+      $('settings-modal').classList.remove('hidden');
+    }
+
+    function closeSettingsModal() {
+      $('settings-modal').classList.add('hidden');
+    }
+
+    async function saveSettings() {
+      const dates = $('s-show-dates').value.trim();
+      if (!dates) {
+        $('settings-modal-error').textContent = 'Show dates are required.';
+        $('settings-modal-error').classList.add('visible');
+        return;
+      }
+
+      const payload = {
+        event_name:         $('s-event-name').value.trim(),
+        event_subtitle:     $('s-event-subtitle').value.trim(),
+        event_description:  $('s-event-desc').value.trim(),
+        show_dates:         dates,
+        early_bird_price:   $('s-eb-price').value.trim(),
+        standard_price:     $('s-std-price').value.trim(),
+        early_bird_limit:   $('s-eb-limit').value.trim(),
+        duitnow_name:       $('s-duitnow-name').value.trim(),
+        duitnow_id:         $('s-duitnow-id').value.trim(),
+      };
+
+      $('btn-save-settings').disabled = true;
+      $('btn-save-settings').textContent = 'Saving…';
+      $('settings-modal-error').classList.remove('visible');
+      $('settings-saved-msg').classList.remove('visible');
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/settings`, {
+          method:  'PUT',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminKey },
+          body:    JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(parseApiError(data) || `HTTP ${res.status}`);
+        }
+        $('settings-saved-msg').classList.add('visible');
+        // Auto-close after 1.2 s
+        setTimeout(closeSettingsModal, 1200);
+      } catch (err) {
+        $('settings-modal-error').textContent = err.message || 'Failed to save settings.';
+        $('settings-modal-error').classList.add('visible');
+      } finally {
+        $('btn-save-settings').disabled = false;
+        $('btn-save-settings').textContent = 'Save Changes';
+      }
+    }
+
+    // Close on backdrop click
+    $('settings-modal').addEventListener('click', e => {
+      if (e.target === $('settings-modal')) closeSettingsModal();
+    });
+
+    // ── Edit modal ────────────────────────────────────────────
+    let editingTicketId = null;
+
+    function openEditModal(ticketId) {
+      const t = allTickets.find(tk => tk.ticket_id === ticketId);
+      if (!t) return;
+
+      editingTicketId = ticketId;
+
+      $('edit-name').value            = t.name;
+      $('edit-email').value           = t.email;
+      $('edit-phone').value           = t.phone;
+      $('edit-ticket-type').value     = t.ticket_type;
+      $('edit-show-date').value       = t.show_date;
+      $('edit-quantity').value        = t.quantity ?? 1;
+      $('edit-payment-status').value  = t.payment_status;
+
+      $('edit-modal-error').textContent = '';
+      $('edit-modal-error').classList.remove('visible');
+      $('btn-save-edit').disabled = false;
+      $('edit-modal').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+      $('edit-modal').classList.add('hidden');
+      editingTicketId = null;
+    }
+
+    async function saveEdit() {
+      if (!editingTicketId) return;
+
+      const payload = {
+        name:           $('edit-name').value.trim(),
+        email:          $('edit-email').value.trim(),
+        phone:          $('edit-phone').value.trim(),
+        ticket_type:    $('edit-ticket-type').value,
+        show_date:      $('edit-show-date').value,
+        quantity:       parseInt($('edit-quantity').value, 10),
+        payment_status: $('edit-payment-status').value,
+      };
+
+      // Basic client-side checks
+      if (!payload.name || !payload.email || !payload.phone) {
+        $('edit-modal-error').textContent = 'Name, email and phone are required.';
+        $('edit-modal-error').classList.add('visible');
+        return;
+      }
+
+      $('btn-save-edit').disabled = true;
+      $('btn-save-edit').textContent = 'Saving…';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/tickets/${editingTicketId}`, {
+          method:  'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Admin-Key':  adminKey,
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(parseApiError(data) || `HTTP ${res.status}`);
+        }
+
+        const updated = await res.json();
+        // Update local cache so the table re-renders correctly without a full fetch
+        const idx = allTickets.findIndex(t => t.ticket_id === editingTicketId);
+        if (idx !== -1) allTickets[idx] = updated;
+
+        closeEditModal();
+        renderTable($('search-input').value.trim().toLowerCase());
+        // Trigger a fresh fetch to keep stats in sync
+        fetchTickets();
+
+      } catch (err) {
+        $('edit-modal-error').textContent = err.message || 'Failed to save. Please try again.';
+        $('edit-modal-error').classList.add('visible');
+      } finally {
+        $('btn-save-edit').disabled = false;
+        $('btn-save-edit').textContent = 'Save Changes';
+      }
+    }
+
+    // Close edit modal on backdrop click
+    $('edit-modal').addEventListener('click', e => {
+      if (e.target === $('edit-modal')) closeEditModal();
+    });
+
+    // ── Delete modal ──────────────────────────────────────────
+    let deletingTicketId = null;
+
+    function openDeleteModal(ticketId, name) {
+      deletingTicketId = ticketId;
+      $('delete-modal-name').textContent = name;
+      $('btn-confirm-delete').disabled = false;
+      $('btn-confirm-delete').textContent = 'Delete';
+      $('delete-modal').classList.remove('hidden');
+    }
+
+    function closeDeleteModal() {
+      $('delete-modal').classList.add('hidden');
+      deletingTicketId = null;
+    }
+
+    async function confirmDelete() {
+      if (!deletingTicketId) return;
+
+      $('btn-confirm-delete').disabled = true;
+      $('btn-confirm-delete').textContent = 'Deleting…';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/tickets/${deletingTicketId}`, {
+          method:  'DELETE',
+          headers: { 'X-Admin-Key': adminKey },
+        });
+
+        if (!res.ok && res.status !== 204) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(parseApiError(data) || `HTTP ${res.status}`);
+        }
+
+        // Remove from local cache and re-render immediately
+        allTickets = allTickets.filter(t => t.ticket_id !== deletingTicketId);
+        closeDeleteModal();
+        renderTable($('search-input').value.trim().toLowerCase());
+        // Full refresh to update stats
+        fetchTickets();
+
+      } catch (err) {
+        $('btn-confirm-delete').disabled = false;
+        $('btn-confirm-delete').textContent = 'Delete';
+        showError('Failed to delete ticket: ' + err.message);
+        closeDeleteModal();
+      }
+    }
+
+    // Close on backdrop click
+    $('delete-modal').addEventListener('click', e => {
+      if (e.target === $('delete-modal')) closeDeleteModal();
+    });
+
+    // ── Live search ──────────────────────────────────────────
+    $('search-input').addEventListener('input', e => {
+      renderTable(e.target.value.trim().toLowerCase());
+    });
+
+    // ── Boot ─────────────────────────────────────────────────
+    maybeShowLogin();
+  </script>
+</body>
+</html>

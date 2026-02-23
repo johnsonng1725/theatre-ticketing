@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Check-In Scanner — Immersive Theatre</title>
+
+  <!-- html5-qrcode: browser camera QR scanner (HTTPS required in production) -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+  <style>
+    /* ── Design tokens ──────────────────────────────────────── */
+    :root {
+      --bg:        #0a0a0f;
+      --surface:   #12121e;
+      --card:      #1a1a2e;
+      --border:    #2a2a45;
+      --gold:      #d4af37;
+      --gold-dim:  #a8892a;
+      --purple:    #8b5cf6;
+      --text:      #e8e8f0;
+      --text-muted:#8888aa;
+      --success:   #10b981;
+      --warning:   #f59e0b;
+      --error:     #ef4444;
+      --radius:    12px;
+      --shadow:    0 8px 32px rgba(0,0,0,0.6);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Nav ────────────────────────────────────────────────── */
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-brand { display: flex; align-items: center; gap: 0.75rem; }
+    .nav-brand .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--gold);
+      box-shadow: 0 0 8px var(--gold);
+    }
+    .nav-brand span { font-weight: 700; font-size: 1rem; color: var(--gold); letter-spacing: 0.04em; }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      padding: 0.4rem 0.7rem;
+      border-radius: 6px;
+    }
+    .nav-links a:hover { color: var(--text); background: var(--card); }
+
+    /* ── Page layout ────────────────────────────────────────── */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem 4rem;
+    }
+
+    .page-header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .page-header .eyebrow {
+      font-size: 0.72rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 0.4rem;
+    }
+    .page-header h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+    }
+    .page-header p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-top: 0.4rem;
+    }
+
+    /* ── Card ───────────────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      width: 100%;
+      max-width: 480px;
+      overflow: hidden;
+    }
+
+    /* ── Scanner area ───────────────────────────────────────── */
+    .scanner-wrap {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    /* The html5-qrcode library injects a video element here */
+    #reader {
+      width: 100%;
+      max-width: 380px;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #000;
+    }
+
+    /* Override library's default button styles */
+    #reader button {
+      background: var(--gold) !important;
+      color: #0a0a0f !important;
+      border: none !important;
+      border-radius: 6px !important;
+      font-weight: 600 !important;
+      padding: 0.5rem 1rem !important;
+      cursor: pointer !important;
+    }
+    #reader select {
+      background: var(--surface) !important;
+      color: var(--text) !important;
+      border: 1px solid var(--border) !important;
+      border-radius: 6px !important;
+      padding: 0.35rem 0.5rem !important;
+    }
+
+    /* ── Controls ───────────────────────────────────────────── */
+    .controls { display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center; }
+
+    .btn {
+      padding: 0.65rem 1.25rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn:hover:not(:disabled)  { opacity: 0.85; transform: translateY(-1px); }
+    .btn:active:not(:disabled) { transform: translateY(0); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-start { background: var(--gold);   color: #0a0a0f; }
+    .btn-stop  { background: var(--error);  color: #fff; }
+    .btn-manual{ background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+
+    /* ── Status bar ─────────────────────────────────────────── */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+    .status-bar.scanning .status-dot {
+      background: var(--success);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    .status-bar.scanning span { color: var(--success); }
+    @keyframes pulse {
+      0%,100% { opacity: 1; }
+      50%      { opacity: 0.25; }
+    }
+
+    /* ── Divider ────────────────────────────────────────────── */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 0;
+    }
+
+    /* ── Manual entry ───────────────────────────────────────── */
+    .manual-section {
+      padding: 1.25rem 1.5rem;
+      display: none;
+    }
+    .manual-section.visible { display: block; }
+
+    .manual-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .manual-row input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.9rem;
+      padding: 0.65rem 0.85rem;
+      outline: none;
+      font-family: monospace;
+    }
+    .manual-row input:focus { border-color: var(--gold); }
+    .manual-row input::placeholder { color: var(--text-muted); font-family: inherit; }
+    .btn-checkin {
+      background: var(--gold);
+      color: #0a0a0f;
+      border: none;
+      border-radius: 8px;
+      padding: 0.65rem 1rem;
+      font-weight: 700;
+      font-size: 0.88rem;
+      cursor: pointer;
+    }
+    .btn-checkin:hover { opacity: 0.9; }
+    .btn-checkin:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Result panel ───────────────────────────────────────── */
+    #result-panel {
+      margin: 0 1.5rem 1.5rem;
+      border-radius: 10px;
+      padding: 1.25rem;
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+    #result-panel.visible { display: block; }
+    #result-panel.success {
+      background: rgba(16,185,129,0.1);
+      border: 1px solid rgba(16,185,129,0.35);
+    }
+    #result-panel.error {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.35);
+    }
+    #result-panel.warning {
+      background: rgba(245,158,11,0.1);
+      border: 1px solid rgba(245,158,11,0.35);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-icon {
+      font-size: 2rem;
+      text-align: center;
+      margin-bottom: 0.5rem;
+    }
+    .result-title {
+      font-size: 1rem;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 0.3rem;
+    }
+    #result-panel.success .result-title { color: var(--success); }
+    #result-panel.error   .result-title { color: var(--error); }
+    #result-panel.warning .result-title { color: var(--warning); }
+
+    .result-message {
+      font-size: 0.88rem;
+      text-align: center;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+    }
+
+    .result-details {
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      padding: 0.85rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem 1rem;
+    }
+    .rd-row { display: flex; flex-direction: column; gap: 0.15rem; }
+    .rd-row span:first-child {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+    }
+    .rd-row span:last-child { font-size: 0.88rem; }
+
+    /* ── Recent check-ins ───────────────────────────────────── */
+    .recent-section {
+      width: 100%;
+      max-width: 480px;
+      margin-top: 1.5rem;
+    }
+    .recent-title {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+      padding-left: 0.25rem;
+    }
+    .recent-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .recent-item {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      animation: fadeIn 0.25s ease;
+    }
+    .recent-item .ri-name  { font-weight: 600; }
+    .recent-item .ri-type  { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.1rem; }
+    .recent-item .ri-time  { font-size: 0.75rem; color: var(--success); }
+    .ri-left { display: flex; flex-direction: column; }
+
+    /* ── Login modal ────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100; padding: 1rem;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2rem;
+      width: 100%; max-width: 360px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.8);
+    }
+    .modal h2 { font-size: 1.15rem; margin-bottom: 0.35rem; }
+    .modal p  { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem; }
+    .modal label {
+      display: block;
+      font-size: 0.75rem; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--text-muted);
+      margin-bottom: 0.35rem;
+    }
+    .modal input {
+      width: 100%; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font-size: 1rem;
+      padding: 0.75rem 1rem; outline: none; margin-bottom: 0.6rem;
+    }
+    .modal input:focus { border-color: var(--gold); }
+    .modal-error { color: var(--error); font-size: 0.82rem; display: none; margin-bottom: 0.6rem; }
+    .modal-error.visible { display: block; }
+    .btn-modal {
+      width: 100%; padding: 0.8rem;
+      background: var(--gold); border: none;
+      border-radius: 8px; color: #0a0a0f;
+      font-weight: 700; font-size: 0.95rem; cursor: pointer;
+    }
+    .btn-modal:hover { opacity: 0.9; }
+
+    @media (max-width: 480px) {
+      .result-details { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Login modal ────────────────────────────────────────── -->
+  <div class="modal-overlay" id="login-modal">
+    <div class="modal">
+      <h2>Admin Access</h2>
+      <p>Enter your admin key to use the scanner.</p>
+      <label for="modal-key">Admin Key</label>
+      <input type="password" id="modal-key" placeholder="Paste your admin key…" autocomplete="off" />
+      <p class="modal-error" id="modal-error">Incorrect key — please try again.</p>
+      <button class="btn-modal" id="modal-submit">Unlock Scanner</button>
+    </div>
+  </div>
+
+  <!-- ── Nav ────────────────────────────────────────────────── -->
+  <nav>
+    <div class="nav-brand">
+      <div class="dot"></div>
+      <span>Theatre Admin</span>
+    </div>
+    <div class="nav-links">
+      <a href="index.html">Registration</a>
+      <a href="admin-dashboard.html">Dashboard</a>
+    </div>
+  </nav>
+
+  <!-- ── Main ───────────────────────────────────────────────── -->
+  <main>
+    <div class="page-header">
+      <p class="eyebrow">Immersive Theatre</p>
+      <h1>Check-In Scanner</h1>
+      <p>Point the camera at a guest's QR code to check them in.</p>
+    </div>
+
+    <!-- Scanner card -->
+    <div class="card">
+
+      <!-- Camera view -->
+      <div class="scanner-wrap">
+        <div id="reader"></div>
+
+        <div class="status-bar" id="status-bar">
+          <div class="status-dot"></div>
+          <span id="status-text">Scanner idle</span>
+        </div>
+
+        <div class="controls">
+          <button class="btn btn-start" id="btn-start">Start Camera</button>
+          <button class="btn btn-stop"  id="btn-stop"  disabled>Stop Camera</button>
+          <button class="btn btn-manual" id="btn-toggle-manual">Manual Entry</button>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <!-- Manual ticket ID entry -->
+      <div class="manual-section" id="manual-section">
+        <div class="manual-row">
+          <input
+            type="text"
+            id="manual-input"
+            placeholder="Paste ticket ID here…"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button class="btn-checkin" id="btn-manual-checkin">Check In</button>
+        </div>
+      </div>
+
+      <!-- Result panel -->
+      <div id="result-panel">
+        <div class="result-icon" id="result-icon"></div>
+        <p class="result-title"   id="result-title"></p>
+        <p class="result-message" id="result-message"></p>
+        <div class="result-details" id="result-details"></div>
+      </div>
+
+    </div><!-- /card -->
+
+    <!-- Recent check-ins log -->
+    <div class="recent-section">
+      <p class="recent-title">Recent Check-Ins This Session</p>
+      <div class="recent-list" id="recent-list"></div>
+    </div>
+
+  </main>
+
+  <script src="./config.js"></script>
+  <script>
+    // API_BASE is defined in config.js — edit that file to change the backend URL.
+    const SESSION_KEY = 'theatre_scanner_key';
+
+    // ── State ────────────────────────────────────────────────
+    let adminKey    = sessionStorage.getItem(SESSION_KEY) || '';
+    let scanner     = null;
+    let isScanning  = false;
+    let processing  = false;          // debounce flag
+    const recentLog = [];             // keeps last 5 check-ins
+
+    // ── Helpers ──────────────────────────────────────────────
+    const $ = id => document.getElementById(id);
+
+    function setStatus(text, active = false) {
+      $('status-text').textContent = text;
+      $('status-bar').className = `status-bar${active ? ' scanning' : ''}`;
+    }
+
+    function formatDate(iso) {
+      const d = new Date(iso + 'T00:00:00');
+      return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    // ── Login modal ──────────────────────────────────────────
+    function maybeShowLogin() {
+      if (!adminKey) {
+        $('login-modal').classList.remove('hidden');
+      } else {
+        $('login-modal').classList.add('hidden');
+      }
+    }
+
+    $('modal-submit').addEventListener('click', attemptLogin);
+    $('modal-key').addEventListener('keydown', e => {
+      if (e.key === 'Enter') attemptLogin();
+    });
+
+    async function attemptLogin() {
+      const key = $('modal-key').value.trim();
+      if (!key) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/ping`, {
+          headers: { 'X-Admin-Key': key }
+        });
+        if (res.status === 401) {
+          $('modal-error').textContent = 'Incorrect key — please try again.';
+          $('modal-error').classList.add('visible');
+          return;
+        }
+        const data = await res.json();
+        if (data.role !== 'scanner') {
+          $('modal-error').textContent = 'This key does not have scanner access.';
+          $('modal-error').classList.add('visible');
+          return;
+        }
+        adminKey = key;
+        sessionStorage.setItem(SESSION_KEY, key);
+        $('modal-error').classList.remove('visible');
+        $('login-modal').classList.add('hidden');
+      } catch {
+        $('modal-error').textContent = 'Cannot reach server. Check your network.';
+        $('modal-error').classList.add('visible');
+      }
+    }
+
+    // ── Scanner controls ─────────────────────────────────────
+    $('btn-start').addEventListener('click', startScanner);
+    $('btn-stop').addEventListener('click', stopScanner);
+
+    function startScanner() {
+      clearResult();
+      scanner = new Html5Qrcode('reader');
+
+      scanner.start(
+        { facingMode: 'environment' },   // rear camera on mobile
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        onScanSuccess,
+        onScanError
+      )
+      .then(() => {
+        isScanning = true;
+        $('btn-start').disabled = true;
+        $('btn-stop').disabled  = false;
+        setStatus('Scanning…', true);
+      })
+      .catch(err => {
+        console.error(err);
+        showResult('error', '✕', 'Camera Error',
+          'Could not access the camera. Ensure HTTPS and camera permission are granted.',
+          null
+        );
+      });
+    }
+
+    function parseApiError(data) {
+      if (!data) return 'An unexpected error occurred.';
+      const d = data.detail;
+      if (!d) return 'An unexpected error occurred.';
+      if (typeof d === 'string') return d;
+      if (Array.isArray(d)) {
+        return d.map(e => {
+          const field = e.loc ? e.loc.slice(-1)[0] : '';
+          return field ? `${field}: ${e.msg}` : e.msg;
+        }).join(' · ');
+      }
+      return JSON.stringify(d);
+    }
+
+    function stopScanner() {
+      if (scanner && isScanning) {
+        scanner.stop().then(() => {
+          scanner.clear();
+          scanner = null;
+          isScanning = false;
+          $('btn-start').disabled = false;
+          $('btn-stop').disabled  = true;
+          setStatus('Scanner stopped');
+        });
+      }
+    }
+
+    function onScanSuccess(decodedText) {
+      if (processing) return;          // prevent duplicate rapid scans
+      processing = true;
+      setStatus('QR detected — checking in…', true);
+      handleCheckin(decodedText.trim());
+    }
+
+    function onScanError() {
+      // html5-qrcode fires this continuously while no QR is in frame — ignore it
+    }
+
+    // ── Manual entry ─────────────────────────────────────────
+    $('btn-toggle-manual').addEventListener('click', () => {
+      const s = $('manual-section');
+      const isVisible = s.classList.toggle('visible');
+      $('btn-toggle-manual').textContent = isVisible ? 'Hide Manual Entry' : 'Manual Entry';
+    });
+
+    $('btn-manual-checkin').addEventListener('click', () => {
+      const id = $('manual-input').value.trim();
+      if (!id) return;
+      handleCheckin(id);
+    });
+
+    $('manual-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const id = $('manual-input').value.trim();
+        if (id) handleCheckin(id);
+      }
+    });
+
+    // ── Check-in API call ────────────────────────────────────
+    async function handleCheckin(ticketId) {
+      $('btn-manual-checkin').disabled = true;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/checkin`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Admin-Key': adminKey
+          },
+          body: JSON.stringify({ ticket_id: ticketId })
+        });
+
+        const data = await res.json();
+
+        if (res.status === 401) {
+          sessionStorage.removeItem(SESSION_KEY);
+          adminKey = '';
+          $('login-modal').classList.remove('hidden');
+          return;
+        }
+
+        if (res.ok) {
+          // Success
+          const t = data.ticket;
+          showResult(
+            'success', '✓',
+            data.message,
+            `${t.ticket_type} · ${formatDate(t.show_date)}`,
+            t
+          );
+          addToRecent(t);
+          $('manual-input').value = '';
+          // Pause scanner briefly so user can read the result
+          if (isScanning) {
+            setStatus('Checked in! Ready for next guest…', true);
+            setTimeout(() => { processing = false; }, 3000);
+          }
+        } else if (res.status === 409) {
+          showResult('warning', '⚠', 'Already Checked In', parseApiError(data), null);
+          setTimeout(() => { processing = false; }, 2500);
+        } else if (res.status === 404) {
+          showResult('error', '✕', 'Ticket Not Found', parseApiError(data), null);
+          setTimeout(() => { processing = false; }, 2500);
+        } else {
+          showResult('error', '✕', 'Error', parseApiError(data), null);
+          setTimeout(() => { processing = false; }, 2500);
+        }
+
+      } catch (err) {
+        console.error(err);
+        showResult('error', '✕', 'Network Error',
+          'Could not reach the server. Please check your connection.', null);
+        setTimeout(() => { processing = false; }, 2500);
+      } finally {
+        $('btn-manual-checkin').disabled = false;
+      }
+    }
+
+    // ── Result display ───────────────────────────────────────
+    function showResult(type, icon, title, message, ticket) {
+      const panel = $('result-panel');
+      panel.className = `visible ${type}`;
+
+      $('result-icon').textContent    = icon;
+      $('result-title').textContent   = title;
+      $('result-message').textContent = message;
+
+      const details = $('result-details');
+      if (ticket) {
+        details.innerHTML = `
+          <div class="rd-row">
+            <span>Name</span>
+            <span>${escape(ticket.name)}</span>
+          </div>
+          <div class="rd-row">
+            <span>Email</span>
+            <span>${escape(ticket.email)}</span>
+          </div>
+          <div class="rd-row">
+            <span>Ticket Type</span>
+            <span>${escape(ticket.ticket_type)}</span>
+          </div>
+          <div class="rd-row">
+            <span>Show Date</span>
+            <span>${formatDate(ticket.show_date)}</span>
+          </div>
+        `;
+        details.style.display = 'grid';
+      } else {
+        details.innerHTML = '';
+        details.style.display = 'none';
+      }
+
+      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function clearResult() {
+      const panel = $('result-panel');
+      panel.className = '';
+      panel.classList.remove('visible');
+    }
+
+    // ── Recent log ───────────────────────────────────────────
+    function addToRecent(ticket) {
+      recentLog.unshift(ticket);
+      if (recentLog.length > 5) recentLog.pop();
+
+      const list = $('recent-list');
+      list.innerHTML = recentLog.map(t => `
+        <div class="recent-item">
+          <div class="ri-left">
+            <span class="ri-name">${escape(t.name)}</span>
+            <span class="ri-type">${escape(t.ticket_type)}</span>
+          </div>
+          <span class="ri-time">Just now</span>
+        </div>
+      `).join('');
+    }
+
+    // Basic XSS prevention
+    function escape(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // ── Boot ─────────────────────────────────────────────────
+    maybeShowLogin();
+  </script>
+</body>
+</html>

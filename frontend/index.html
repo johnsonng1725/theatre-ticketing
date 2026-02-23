@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Register — Immersive Theatre</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <style>
+    /* ── Design tokens ───────────────────────────────────────────────── */
+    :root {
+      --bg:        #0a0a0f;
+      --surface:   #12121e;
+      --card:      #1a1a2e;
+      --border:    #2a2a45;
+      --gold:      #d4af37;
+      --gold-dim:  #a8892a;
+      --purple:    #8b5cf6;
+      --text:      #e8e8f0;
+      --text-muted:#8888aa;
+      --success:   #10b981;
+      --error:     #ef4444;
+      --warning:   #f59e0b;
+      --radius:    12px;
+      --shadow:    0 8px 32px rgba(0,0,0,0.6);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem 4rem;
+    }
+
+    /* ── Header ──────────────────────────────────────────────────────── */
+    header { text-align: center; margin-bottom: 2.5rem; }
+    header .eyebrow {
+      font-size: 0.75rem; letter-spacing: 0.25em;
+      text-transform: uppercase; color: var(--gold); margin-bottom: 0.5rem;
+    }
+    header h1 {
+      font-size: clamp(1.8rem, 5vw, 2.8rem); font-weight: 700;
+      background: linear-gradient(135deg, var(--gold) 0%, var(--purple) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; line-height: 1.2;
+    }
+    header p { margin-top: 0.75rem; color: var(--text-muted); font-size: 0.95rem; }
+
+    /* ── Card ────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      width: 100%; max-width: 540px; padding: 2.5rem 2rem;
+    }
+
+    /* ── Section header inside card ──────────────────────────────────── */
+    .section-label {
+      font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.18em;
+      color: var(--gold); margin-bottom: 1.25rem; display: flex;
+      align-items: center; gap: 0.5rem;
+    }
+    .section-label::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+
+    /* ── Form ────────────────────────────────────────────────────────── */
+    .form-grid { display: grid; gap: 1.25rem; }
+
+    .field { display: flex; flex-direction: column; gap: 0.4rem; }
+
+    label {
+      font-size: 0.82rem; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--text-muted); font-weight: 600;
+    }
+
+    input, select {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 1rem;
+      padding: 0.75rem 1rem; outline: none; transition: border-color 0.2s; width: 100%;
+    }
+    input:focus, select:focus {
+      border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,175,55,0.15);
+    }
+    input::placeholder { color: var(--text-muted); }
+    select option { background: var(--card); color: var(--text); }
+    select option:disabled { color: var(--text-muted); }
+
+    /* ── Ticket type button cards ────────────────────────────────────── */
+    .ticket-type-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+    .ticket-type-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 0.5rem;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      width: 100%;
+    }
+    .ticket-type-btn:hover:not(.sold-out):not(.selected) {
+      border-color: rgba(212,175,55,0.5);
+      background: rgba(212,175,55,0.04);
+    }
+    .ticket-type-btn.selected {
+      border-color: var(--gold);
+      background: rgba(212,175,55,0.1);
+    }
+    .ticket-type-btn.sold-out {
+      opacity: 0.55;
+      cursor: not-allowed;
+      background: rgba(255,255,255,0.02);
+    }
+    .ttb-name {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: 0.04em;
+    }
+    .ttb-price {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--gold);
+    }
+    .ticket-type-btn.sold-out .ttb-price {
+      color: var(--text-muted);
+      text-decoration: line-through;
+    }
+    .ttb-remaining {
+      font-size: 0.7rem;
+      color: var(--success);
+      font-weight: 600;
+      min-height: 1em;
+    }
+    .ttb-soldout-badge {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-weight: 700;
+      color: var(--text-muted);
+      background: var(--border);
+      border-radius: 99px;
+      padding: 0.18rem 0.55rem;
+      display: none;
+    }
+    .ticket-type-btn.sold-out .ttb-soldout-badge { display: inline-block; }
+    .ticket-type-btn.sold-out .ttb-remaining     { display: none; }
+
+    /* ── Show date button cards ──────────────────────────────────────── */
+    .show-date-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+    .show-date-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 0.85rem 1.1rem;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      width: 100%;
+      text-align: left;
+    }
+    .show-date-btn:hover:not(.sold-out):not(.selected) {
+      border-color: rgba(212,175,55,0.5);
+      background: rgba(212,175,55,0.04);
+    }
+    .show-date-btn.selected {
+      border-color: var(--gold);
+      background: rgba(212,175,55,0.1);
+    }
+    .show-date-btn.sold-out {
+      opacity: 0.55;
+      cursor: not-allowed;
+      background: rgba(255,255,255,0.02);
+    }
+    .sdb-date {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .sdb-right {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-shrink: 0;
+      margin-left: 0.75rem;
+    }
+    .sdb-remaining {
+      font-size: 0.72rem;
+      color: var(--success);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .show-date-btn.sold-out .sdb-remaining { display: none; }
+    .sdb-soldout-badge {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-weight: 700;
+      color: var(--text-muted);
+      background: var(--border);
+      border-radius: 99px;
+      padding: 0.18rem 0.55rem;
+      display: none;
+      white-space: nowrap;
+    }
+    .show-date-btn.sold-out .sdb-soldout-badge { display: inline-block; }
+
+    /* ── Sold-out hint ───────────────────────────────────────────────── */
+    .sold-out-hint { font-size: 0.78rem; color: var(--error); margin-top: 0.2rem; display: none; }
+    .sold-out-hint.visible { display: block; }
+
+    /* ── Quantity stepper ────────────────────────────────────────────── */
+    .qty-row {
+      display: flex; align-items: center; gap: 0; width: 100%;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      overflow: hidden;
+    }
+    .qty-btn {
+      width: 44px; height: 48px; background: transparent; border: none;
+      color: var(--gold); font-size: 1.4rem; font-weight: 300; cursor: pointer;
+      flex-shrink: 0; transition: background 0.15s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .qty-btn:hover:not(:disabled) { background: rgba(212,175,55,0.1); }
+    .qty-btn:disabled { color: var(--border); cursor: not-allowed; }
+    .qty-display {
+      flex: 1; text-align: center; font-size: 1.1rem; font-weight: 600;
+      color: var(--text);
+    }
+    .qty-max-note { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+    /* ── Order summary ───────────────────────────────────────────────── */
+    #order-summary {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      padding: 1.1rem 1.25rem; margin-top: 1.5rem; display: none;
+    }
+    #order-summary.visible { display: block; }
+    .os-row {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 0.92rem; color: var(--text-muted); padding-bottom: 0.6rem;
+    }
+    .os-divider { border: none; border-top: 1px solid var(--border); margin: 0.4rem 0; }
+    .os-total {
+      display: flex; justify-content: space-between; align-items: center;
+      padding-top: 0.6rem;
+    }
+    .os-total span:first-child { font-weight: 600; }
+    .os-total .os-amount {
+      font-size: 1.35rem; font-weight: 800; color: var(--gold);
+    }
+
+    /* ── Divider with label ──────────────────────────────────────────── */
+    .section-divider {
+      border: none; border-top: 1px solid var(--border);
+      margin: 2rem 0 1.5rem;
+    }
+
+    /* ── Payment section ─────────────────────────────────────────────── */
+    #payment-section { display: none; }
+    #payment-section.visible { display: block; }
+
+    .duitnow-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 1.5rem; text-align: center; margin-bottom: 1rem;
+    }
+    .duitnow-title {
+      font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em;
+      color: var(--text-muted); margin-bottom: 1rem;
+    }
+    .duitnow-qr-wrap {
+      display: inline-flex; flex-direction: column; align-items: center; gap: 0.75rem;
+    }
+    /* ──────────────────────────────────────────────────────────────────
+       Replace the src of #duitnow-qr-img with your actual DuitNow QR
+       image before deploying. Place the file in the frontend/ folder.
+    ────────────────────────────────────────────────────────────────── */
+    #duitnow-qr-img {
+      width: 200px; height: 200px; border-radius: 10px;
+      background: #fff; object-fit: contain; padding: 8px;
+    }
+    .duitnow-account {
+      font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;
+    }
+    .duitnow-account strong { color: var(--text); }
+
+    /* Payment reminder banner */
+    .payment-reminder {
+      background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.4);
+      border-radius: 10px; padding: 1rem 1.1rem; margin-bottom: 1.25rem;
+      display: flex; gap: 0.75rem; align-items: flex-start;
+    }
+    .reminder-icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 0.05rem; }
+    .reminder-text { font-size: 0.88rem; line-height: 1.5; }
+    .reminder-text strong { color: var(--warning); display: block; margin-bottom: 0.2rem; }
+
+    /* ── Receipt upload ──────────────────────────────────────────────── */
+    .receipt-label-row {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 0.4rem;
+    }
+    .receipt-label-row label { margin: 0; }
+    .receipt-required {
+      font-size: 0.7rem; color: var(--error); text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .receipt-drop {
+      background: var(--surface); border: 2px dashed var(--border);
+      border-radius: 10px; padding: 1.5rem 1rem;
+      text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s;
+      position: relative;
+    }
+    .receipt-drop:hover,
+    .receipt-drop.drag-over { border-color: var(--gold); background: rgba(212,175,55,0.05); }
+    .receipt-drop input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%;
+    }
+    .receipt-drop-icon { font-size: 1.8rem; margin-bottom: 0.4rem; }
+    .receipt-drop-text { font-size: 0.88rem; color: var(--text-muted); }
+    .receipt-drop-text span { color: var(--gold); }
+
+    /* Preview after file is chosen */
+    .receipt-preview {
+      display: none; margin-top: 0.75rem;
+      background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.3);
+      border-radius: 8px; padding: 0.7rem 1rem;
+      display: none; align-items: center; gap: 0.75rem;
+    }
+    .receipt-preview.visible { display: flex; }
+    .receipt-preview img { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; }
+    .receipt-preview-info { flex: 1; min-width: 0; }
+    .receipt-preview-name {
+      font-size: 0.88rem; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; color: var(--success);
+    }
+    .receipt-preview-size { font-size: 0.75rem; color: var(--text-muted); }
+    .receipt-remove {
+      background: transparent; border: none; color: var(--text-muted);
+      cursor: pointer; font-size: 1.1rem; padding: 0.2rem; flex-shrink: 0;
+    }
+    .receipt-remove:hover { color: var(--error); }
+
+    /* ── Submit button ───────────────────────────────────────────────── */
+    .btn-submit {
+      width: 100%; padding: 0.9rem;
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dim) 100%);
+      border: none; border-radius: 8px; color: #0a0a0f;
+      font-size: 1rem; font-weight: 700; letter-spacing: 0.04em;
+      cursor: pointer; margin-top: 1.5rem;
+      transition: opacity 0.2s, transform 0.1s, background 0.2s;
+    }
+    .btn-submit:hover:not(:disabled)  { opacity: 0.9; transform: translateY(-1px); }
+    .btn-submit:active:not(:disabled) { transform: translateY(0); }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-submit.sold-out {
+      background: var(--border); color: var(--text-muted); opacity: 1; cursor: not-allowed;
+    }
+
+    /* ── Spinner ─────────────────────────────────────────────────────── */
+    .spinner {
+      display: inline-block; width: 18px; height: 18px;
+      border: 2px solid rgba(0,0,0,0.3); border-top-color: #0a0a0f;
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+      vertical-align: middle; margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Alerts ──────────────────────────────────────────────────────── */
+    .alert {
+      border-radius: 8px; padding: 0.85rem 1rem; font-size: 0.9rem;
+      display: none; margin-top: 1rem;
+    }
+    .alert.error   { background: rgba(239,68,68,0.12);  border: 1px solid var(--error);   color: var(--error); }
+    .alert.success { background: rgba(16,185,129,0.12); border: 1px solid var(--success); color: var(--success); }
+    .alert.visible { display: block; }
+
+    /* ── Ticket result ───────────────────────────────────────────────── */
+    #ticket-result { display: none; margin-top: 2rem; text-align: center; }
+    #ticket-result.visible { display: block; }
+
+    .ticket-card {
+      background: var(--card); border: 1px solid var(--gold);
+      border-radius: var(--radius); padding: 2rem 1.5rem;
+      box-shadow: 0 0 30px rgba(212,175,55,0.1);
+    }
+    .ticket-card .tc-label {
+      font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--gold); margin-bottom: 0.4rem;
+    }
+    .ticket-card h2 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+    .ticket-card .tc-meta { color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1.5rem; }
+
+    #qr-container { display: flex; justify-content: center; margin: 1.5rem 0; }
+    #qr-container canvas, #qr-container img {
+      border-radius: 10px; padding: 10px; background: #fff;
+    }
+
+    .ticket-id-display {
+      font-family: monospace; font-size: 0.78rem; color: var(--text-muted);
+      word-break: break-all; margin-bottom: 1.5rem;
+    }
+
+    .ticket-details {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 0.75rem 1.5rem; text-align: left; margin-bottom: 1.5rem;
+    }
+    .td-row { display: flex; flex-direction: column; gap: 0.2rem; }
+    .td-row span:first-child {
+      font-size: 0.7rem; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--text-muted);
+    }
+    .td-row span:last-child { font-size: 0.95rem; }
+
+    .btn-print {
+      padding: 0.7rem 1.5rem; background: transparent;
+      border: 1px solid var(--gold); border-radius: 8px;
+      color: var(--gold); font-size: 0.9rem; cursor: pointer; transition: background 0.2s;
+    }
+    .btn-print:hover { background: rgba(212,175,55,0.1); }
+
+    /* ── Print ───────────────────────────────────────────────────────── */
+    @media print {
+      body { background: #fff; color: #000; padding: 0; }
+      header, #registration-form, .btn-print, .alert { display: none !important; }
+      #ticket-result { display: block !important; }
+      .ticket-card { border-color: #000; box-shadow: none; background: #fff; color: #000; }
+      .ticket-card .tc-label { color: #555; }
+      .td-row span:first-child { color: #555; }
+      #qr-container canvas, #qr-container img { border: 1px solid #ccc; }
+    }
+
+    @media (max-width: 480px) {
+      .card { padding: 1.5rem 1.25rem; }
+      .ticket-details { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <p class="eyebrow" id="hdr-eyebrow">Immersive Theatre Experience</p>
+    <h1 id="hdr-title">Reserve Your Place</h1>
+    <p id="hdr-desc">Complete the form, pay, and upload your receipt to confirm your booking.</p>
+  </header>
+
+  <div class="card" id="registration-form">
+    <form id="reg-form" novalidate>
+
+      <!-- ── Step 1: Guest details ──────────────────────────────────── -->
+      <p class="section-label">Guest Details</p>
+      <div class="form-grid">
+
+        <div class="field">
+          <label for="name">Full Name</label>
+          <input type="text" id="name" placeholder="e.g. Jane Doe"
+            required autocomplete="name" />
+        </div>
+
+        <div class="field">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" placeholder="e.g. jane@example.com"
+            required autocomplete="email" />
+        </div>
+
+        <div class="field">
+          <label for="phone">Phone Number</label>
+          <input type="tel" id="phone" placeholder="e.g. 010-001 0000"
+            required autocomplete="tel" />
+        </div>
+
+        <div class="field">
+          <label>Ticket Type</label>
+          <div class="ticket-type-grid">
+            <button type="button" class="ticket-type-btn" id="btn-early-bird"
+                    onclick="selectTicketType('Early Bird')">
+              <span class="ttb-name">Early Bird</span>
+              <span class="ttb-price" id="ttb-eb-price">RM25</span>
+              <span class="ttb-remaining" id="ttb-eb-remaining"></span>
+              <span class="ttb-soldout-badge">Sold Out</span>
+            </button>
+            <button type="button" class="ticket-type-btn" id="btn-standard"
+                    onclick="selectTicketType('Standard')">
+              <span class="ttb-name">Standard</span>
+              <span class="ttb-price" id="ttb-std-price">RM30</span>
+              <span class="ttb-remaining" id="ttb-std-remaining"></span>
+            </button>
+          </div>
+          <input type="hidden" id="ticket_type" value="" />
+          <span class="sold-out-hint" id="early-bird-hint"></span>
+        </div>
+
+        <div class="field">
+          <label>Show Date</label>
+          <div class="show-date-grid" id="show-date-grid">
+            <!-- Populated dynamically from /api/settings -->
+          </div>
+          <input type="hidden" id="show_date" value="" />
+        </div>
+
+        <!-- Quantity stepper -->
+        <div class="field">
+          <label>Number of Tickets</label>
+          <div class="qty-row">
+            <button type="button" class="qty-btn" id="qty-minus">−</button>
+            <span class="qty-display" id="qty-display">1</span>
+            <button type="button" class="qty-btn" id="qty-plus">+</button>
+          </div>
+          <span class="qty-max-note" id="qty-max-note"></span>
+        </div>
+
+      </div><!-- /form-grid -->
+
+      <!-- ── Order summary ──────────────────────────────────────────── -->
+      <div id="order-summary">
+        <div class="os-row">
+          <span id="os-desc">—</span>
+          <span id="os-line">RM0</span>
+        </div>
+        <hr class="os-divider" />
+        <div class="os-total">
+          <span>Total</span>
+          <span class="os-amount" id="os-total">RM0</span>
+        </div>
+      </div>
+
+      <!-- ── Step 2: Payment ────────────────────────────────────────── -->
+      <div id="payment-section">
+        <hr class="section-divider" />
+        <p class="section-label">Payment</p>
+
+        <!-- DuitNow QR -->
+        <div class="duitnow-box">
+          <p class="duitnow-title">Scan with any Malaysian banking app</p>
+          <div class="duitnow-qr-wrap">
+
+            <img id="duitnow-qr-img" src="./duitnow-qr.png" alt="DuitNow QR Code" />
+
+            <p class="duitnow-account">
+              <strong id="duitnow-name">YOUR NAME / ORGANISATION</strong><br/>
+              DuitNow ID: <span id="duitnow-id">01X-XXX XXXX</span>
+            </p>
+          </div>
+        </div>
+
+        <!-- Important reminder -->
+        <div class="payment-reminder">
+          <span class="reminder-icon">⚠️</span>
+          <div class="reminder-text">
+            <strong>Important — Payment Reference</strong>
+            When making the transfer, please enter your <strong>full name</strong>
+            in the <strong>reference / memo</strong> field of your banking app.
+            This helps us match your payment to your booking.
+          </div>
+        </div>
+
+        <!-- Receipt upload -->
+        <div class="field">
+          <div class="receipt-label-row">
+            <label>Upload Payment Receipt</label>
+            <span class="receipt-required">Required</span>
+          </div>
+
+          <div class="receipt-drop" id="receipt-drop">
+            <input type="file" id="receipt-input" accept="image/*,.pdf" />
+            <div class="receipt-drop-icon">📎</div>
+            <p class="receipt-drop-text">
+              Drag &amp; drop or <span>browse file</span><br/>
+              <small style="font-size:0.78rem">JPG, PNG or PDF · max 10 MB</small>
+            </p>
+          </div>
+
+          <div class="receipt-preview" id="receipt-preview">
+            <img id="receipt-thumb" src="" alt="" />
+            <div class="receipt-preview-info">
+              <p class="receipt-preview-name" id="receipt-name"></p>
+              <p class="receipt-preview-size" id="receipt-size"></p>
+            </div>
+            <button type="button" class="receipt-remove" id="receipt-remove" title="Remove">✕</button>
+          </div>
+        </div>
+
+      </div><!-- /payment-section -->
+
+      <!-- ── Alerts + Submit ────────────────────────────────────────── -->
+      <div class="alert error"   id="error-msg"></div>
+      <div class="alert success" id="success-msg"></div>
+
+      <button type="submit" class="btn-submit" id="submit-btn" disabled>
+        Complete Registration
+      </button>
+
+    </form>
+  </div>
+
+  <!-- ── Ticket result ────────────────────────────────────────────── -->
+  <div id="ticket-result">
+    <div class="ticket-card">
+      <p class="tc-label">Your Ticket</p>
+      <h2 id="tc-name"></h2>
+      <p class="tc-meta" id="tc-meta"></p>
+      <div id="qr-container"></div>
+      <p class="ticket-id-display">Ticket ID: <span id="tc-id"></span></p>
+      <div class="ticket-details">
+        <div class="td-row"><span>Email</span><span id="td-email"></span></div>
+        <div class="td-row"><span>Phone</span><span id="td-phone"></span></div>
+        <div class="td-row"><span>Ticket Type</span><span id="td-type"></span></div>
+        <div class="td-row"><span>Show Date</span><span id="td-date"></span></div>
+        <div class="td-row"><span>Quantity</span><span id="td-qty"></span></div>
+        <div class="td-row"><span>Total Paid</span><span id="td-total"></span></div>
+      </div>
+      <button class="btn-print" onclick="window.print()">Print / Save as PDF</button>
+    </div>
+  </div>
+
+  <script src="./config.js"></script>
+  <script>
+    // API_BASE is defined in config.js — edit that file to change the backend URL.
+
+    // Ticket prices — loaded from /api/settings on init
+    let PRICES = { 'Early Bird': 25, 'Standard': 30 };
+
+    // ── State ────────────────────────────────────────────────────────
+    let availability  = {};
+    let quantity      = 1;
+    let maxQty        = 10;
+    let receiptBase64 = null;   // base64 data URI
+    let receiptName   = null;
+
+    // ── Helpers ──────────────────────────────────────────────────────
+    const $ = id => document.getElementById(id);
+
+    function showError(msg) {
+      $('error-msg').textContent = msg;
+      $('error-msg').classList.add('visible');
+      $('success-msg').classList.remove('visible');
+    }
+
+    // FastAPI returns detail as a plain string for HTTPException,
+    // but as an array of {loc, msg, type} objects for Pydantic 422 errors.
+    function parseApiError(data) {
+      if (!data) return 'An unexpected error occurred. Please try again.';
+      const d = data.detail;
+      if (!d) return data.message || 'Registration failed. Please try again.';
+      if (typeof d === 'string') return d;
+      if (Array.isArray(d)) {
+        return d.map(e => {
+          const field = e.loc ? e.loc.slice(-1)[0] : '';
+          return field ? `${field}: ${e.msg}` : e.msg;
+        }).join(' · ');
+      }
+      return JSON.stringify(d);
+    }
+    function showSuccess(msg) {
+      $('success-msg').textContent = msg;
+      $('success-msg').classList.add('visible');
+      $('error-msg').classList.remove('visible');
+    }
+    function clearAlerts() {
+      $('error-msg').classList.remove('visible');
+      $('success-msg').classList.remove('visible');
+    }
+
+    // ── Availability ─────────────────────────────────────────────────
+    async function fetchAvailability() {
+      try {
+        const res = await fetch(`${API_BASE}/api/availability`);
+        if (res.ok) {
+          availability = await res.json();
+          updateShowDateButtons();
+          updateEarlyBirdOption($('show_date').value);
+        }
+      } catch (err) {
+        console.warn('Could not fetch availability:', err);
+      }
+    }
+
+    // ── Show date button selection ────────────────────────────────────
+    function selectShowDate(iso) {
+      const btn = document.querySelector(`.show-date-btn[data-iso="${iso}"]`);
+      if (btn && btn.classList.contains('sold-out')) return;
+
+      $('show_date').value = iso;
+
+      document.querySelectorAll('.show-date-btn').forEach(b => b.classList.remove('selected'));
+      if (btn) btn.classList.add('selected');
+
+      updateEarlyBirdOption(iso);
+      updatePaymentSection();
+      updateSubmitButton();
+    }
+
+    function updateShowDateButtons() {
+      document.querySelectorAll('.show-date-btn').forEach(btn => {
+        const iso   = btn.dataset.iso;
+        const data  = availability[iso];
+        const remEl = btn.querySelector('.sdb-remaining');
+
+        if (!data) {
+          btn.classList.remove('sold-out');
+          if (remEl) remEl.textContent = '';
+          return;
+        }
+
+        if (data.total_sold_out) {
+          btn.classList.add('sold-out');
+          if (remEl) remEl.textContent = '';
+          // Auto-deselect if this date was selected
+          if ($('show_date').value === iso) {
+            $('show_date').value = '';
+            btn.classList.remove('selected');
+            updateEarlyBirdOption('');
+            updatePaymentSection();
+            updateSubmitButton();
+          }
+        } else {
+          btn.classList.remove('sold-out');
+          if (remEl) remEl.textContent = `${data.total_remaining} seats left`;
+        }
+      });
+    }
+
+    // ── Ticket type button selection ─────────────────────────────────
+    function selectTicketType(value) {
+      // Block clicking a sold-out Early Bird card
+      if (value === 'Early Bird' && $('btn-early-bird').classList.contains('sold-out')) return;
+
+      $('ticket_type').value = value;
+
+      // Highlight selected card
+      document.querySelectorAll('.ticket-type-btn').forEach(b => b.classList.remove('selected'));
+      const btnId = value === 'Early Bird' ? 'btn-early-bird' : 'btn-standard';
+      $(btnId).classList.add('selected');
+
+      updateQtyMax();
+      updateOrderSummary();
+      updatePaymentSection();
+      updateSubmitButton();
+    }
+
+    function updateEarlyBirdOption(showDate) {
+      const btn       = $('btn-early-bird');
+      const remaining = $('ttb-eb-remaining');
+      const stdRem    = $('ttb-std-remaining');
+      const hint      = $('early-bird-hint');
+
+      if (!showDate || !availability[showDate]) {
+        btn.classList.remove('sold-out');
+        remaining.textContent = '';
+        stdRem.textContent    = '';
+        hint.classList.remove('visible');
+        updateQtyMax();
+        updateOrderSummary();
+        updateSubmitButton();
+        return;
+      }
+
+      const { early_bird_remaining, early_bird_sold_out, total_remaining } = availability[showDate];
+
+      if (early_bird_sold_out) {
+        btn.classList.add('sold-out');
+        remaining.textContent = '';
+        hint.textContent = 'Early Bird tickets are sold out for this date.';
+        hint.classList.add('visible');
+        // Deselect Early Bird if it was active
+        if ($('ticket_type').value === 'Early Bird') {
+          $('ticket_type').value = '';
+          btn.classList.remove('selected');
+        }
+      } else {
+        btn.classList.remove('sold-out');
+        remaining.textContent = `${early_bird_remaining} left`;
+        hint.classList.remove('visible');
+      }
+
+      stdRem.textContent = `${total_remaining} left`;
+
+      updateQtyMax();
+      updateOrderSummary();
+      updateSubmitButton();
+    }
+
+    // ── Quantity logic ───────────────────────────────────────────────
+    function updateQtyMax() {
+      const type     = $('ticket_type').value;
+      const showDate = $('show_date').value;
+
+      if (type === 'Early Bird' && showDate && availability[showDate]) {
+        maxQty = availability[showDate].early_bird_remaining;
+      } else {
+        maxQty = 10;
+      }
+      maxQty = Math.max(1, maxQty);
+
+      // Clamp current quantity
+      if (quantity > maxQty) {
+        quantity = maxQty;
+        $('qty-display').textContent = quantity;
+      }
+
+      $('qty-minus').disabled = quantity <= 1;
+      $('qty-plus').disabled  = quantity >= maxQty;
+
+      $('qty-max-note').textContent = (type === 'Early Bird' && maxQty < 10)
+        ? `Max ${maxQty} Early Bird ticket(s) remaining for this date`
+        : '';
+    }
+
+    $('qty-minus').addEventListener('click', () => {
+      if (quantity > 1) {
+        quantity--;
+        $('qty-display').textContent = quantity;
+        updateQtyMax();
+        updateOrderSummary();
+        updateSubmitButton();
+      }
+    });
+
+    $('qty-plus').addEventListener('click', () => {
+      if (quantity < maxQty) {
+        quantity++;
+        $('qty-display').textContent = quantity;
+        updateQtyMax();
+        updateOrderSummary();
+        updateSubmitButton();
+      }
+    });
+
+    // ── Order summary ────────────────────────────────────────────────
+    function updateOrderSummary() {
+      const type  = $('ticket_type').value;
+      const price = PRICES[type];
+      const el    = $('order-summary');
+
+      if (!type || !price) { el.classList.remove('visible'); return; }
+
+      const total = price * quantity;
+      $('os-desc').textContent  = `${type} × ${quantity}`;
+      $('os-line').textContent  = `RM${price} × ${quantity}`;
+      $('os-total').textContent = `RM${total}`;
+      el.classList.add('visible');
+    }
+
+    // ── Payment section visibility ───────────────────────────────────
+    function updatePaymentSection() {
+      const type     = $('ticket_type').value;
+      const showDate = $('show_date').value;
+
+      const soldOut = type === 'Early Bird' &&
+                      showDate && availability[showDate] &&
+                      availability[showDate].early_bird_sold_out;
+
+      if (type && showDate && !soldOut) {
+        $('payment-section').classList.add('visible');
+      } else {
+        $('payment-section').classList.remove('visible');
+      }
+    }
+
+    // ── Submit button state ──────────────────────────────────────────
+    function updateSubmitButton() {
+      const btn      = $('submit-btn');
+      const type     = $('ticket_type').value;
+      const showDate = $('show_date').value;
+
+      const soldOut = type === 'Early Bird' &&
+                      showDate && availability[showDate] &&
+                      availability[showDate].early_bird_sold_out;
+
+      if (soldOut) {
+        btn.disabled = true;
+        btn.classList.add('sold-out');
+        btn.textContent = 'Early Bird Sold Out';
+        return;
+      }
+
+      btn.classList.remove('sold-out');
+      // Enable only when all required fields are filled AND receipt uploaded
+      const name  = $('name').value.trim();
+      const email = $('email').value.trim();
+      const phone = $('phone').value.trim();
+      const ready = name && email && phone && type && showDate && receiptBase64;
+
+      btn.disabled = !ready;
+      btn.innerHTML = 'Complete Registration';
+    }
+
+    // Re-evaluate submit on any text field change
+    ['name', 'email', 'phone'].forEach(id => {
+      $(id).addEventListener('input', updateSubmitButton);
+    });
+
+    // ── Receipt upload ───────────────────────────────────────────────
+    const dropZone    = $('receipt-drop');
+    const fileInput   = $('receipt-input');
+    const preview     = $('receipt-preview');
+    const thumb       = $('receipt-thumb');
+    const nameLbl     = $('receipt-name');
+    const sizeLbl     = $('receipt-size');
+
+    dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file) processReceiptFile(file);
+    });
+
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
+      if (file) processReceiptFile(file);
+    });
+
+    $('receipt-remove').addEventListener('click', () => {
+      receiptBase64 = null;
+      receiptName   = null;
+      fileInput.value = '';
+      preview.classList.remove('visible');
+      thumb.src = '';
+      updateSubmitButton();
+    });
+
+    function processReceiptFile(file) {
+      if (file.size > 10 * 1024 * 1024) {
+        showError('Receipt file is too large (max 10 MB).');
+        return;
+      }
+
+      const isPDF = file.type === 'application/pdf';
+
+      if (isPDF) {
+        // Store PDF directly as base64
+        const reader = new FileReader();
+        reader.onload = e => {
+          receiptBase64 = e.target.result;
+          receiptName   = file.name;
+          showReceiptPreview(file, null);
+          updateSubmitButton();
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // Compress image before storing
+        compressImage(file, 1200, 0.82, dataUrl => {
+          receiptBase64 = dataUrl;
+          receiptName   = file.name;
+          showReceiptPreview(file, dataUrl);
+          updateSubmitButton();
+        });
+      }
+    }
+
+    function showReceiptPreview(file, dataUrl) {
+      nameLbl.textContent = file.name;
+      sizeLbl.textContent = formatBytes(file.size);
+      thumb.src = dataUrl || ''; // PDFs won't have a thumbnail
+      if (!dataUrl) thumb.style.display = 'none'; else thumb.style.display = '';
+      preview.classList.add('visible');
+    }
+
+    function compressImage(file, maxDim, quality, callback) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            const ratio = Math.min(maxDim / width, maxDim / height);
+            width  = Math.round(width  * ratio);
+            height = Math.round(height * ratio);
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width  = width;
+          canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          callback(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function formatBytes(bytes) {
+      if (bytes < 1024)       return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    // ── Form submit ──────────────────────────────────────────────────
+    $('reg-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      clearAlerts();
+
+      const name       = $('name').value.trim();
+      const email      = $('email').value.trim();
+      const phone      = $('phone').value.trim();
+      const ticketType = $('ticket_type').value;
+      const showDate   = $('show_date').value;
+
+      if (!name || !email || !phone || !ticketType || !showDate) {
+        showError('Please fill in all fields before submitting.');
+        return;
+      }
+      if (!receiptBase64) {
+        showError('Please upload your payment receipt before submitting.');
+        return;
+      }
+
+      // Final sold-out guard
+      if (ticketType === 'Early Bird' && availability[showDate]?.early_bird_sold_out) {
+        showError('Early Bird tickets are sold out for this date. Please select Standard.');
+        return;
+      }
+
+      // Temporarily disable button + show spinner
+      const btn = $('submit-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Registering…';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name, email, phone,
+            ticket_type:      ticketType,
+            show_date:        showDate,
+            quantity:         quantity,
+            receipt_data:     receiptBase64,
+            receipt_filename: receiptName,
+          })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          showError(parseApiError(data));
+          if (ticketType === 'Early Bird') await fetchAvailability();
+          return;
+        }
+
+        renderTicket(data);
+        showSuccess('Registration confirmed! Please save or print your ticket.');
+        $('reg-form').reset();
+        receiptBase64 = null;
+        receiptName   = null;
+        quantity      = 1;
+        $('qty-display').textContent = 1;
+        preview.classList.remove('visible');
+        $('order-summary').classList.remove('visible');
+        $('payment-section').classList.remove('visible');
+        // Clear button card selections
+        document.querySelectorAll('.ticket-type-btn').forEach(b => b.classList.remove('selected'));
+        document.querySelectorAll('.show-date-btn').forEach(b => b.classList.remove('selected'));
+        $('show_date').value = '';
+
+        if (ticketType === 'Early Bird') await fetchAvailability();
+
+      } catch (err) {
+        console.error(err);
+        showError('Network error — please check your connection and try again.');
+      } finally {
+        btn.disabled  = false;
+        btn.innerHTML = 'Complete Registration';
+        updateSubmitButton();
+      }
+    });
+
+    // ── Render ticket card ───────────────────────────────────────────
+    function renderTicket(ticket) {
+      const price = PRICES[ticket.ticket_type] ?? 0;
+      $('tc-name').textContent  = ticket.name;
+      $('tc-meta').textContent  = `${ticket.ticket_type} × ${ticket.quantity} · ${formatDate(ticket.show_date)}`;
+      $('tc-id').textContent    = ticket.ticket_id;
+      $('td-email').textContent = ticket.email;
+      $('td-phone').textContent = ticket.phone;
+      $('td-type').textContent  = ticket.ticket_type;
+      $('td-date').textContent  = formatDate(ticket.show_date);
+      $('td-qty').textContent   = ticket.quantity;
+      $('td-total').textContent = `RM${price * ticket.quantity}`;
+
+      const container = $('qr-container');
+      container.innerHTML = '';
+      new QRCode(container, {
+        text: ticket.ticket_id, width: 200, height: 200,
+        colorDark: '#000000', colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H
+      });
+
+      const result = $('ticket-result');
+      result.classList.add('visible');
+      setTimeout(() => result.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+    }
+
+    function formatDate(iso) {
+      const d = new Date(iso + 'T00:00:00');
+      return d.toLocaleDateString('en-GB', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+      });
+    }
+
+    // ── Settings loader ──────────────────────────────────────────────
+    function formatShowDateLabel(iso) {
+      const d = new Date(iso + 'T00:00:00');
+      return d.toLocaleDateString('en-GB', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+      });
+    }
+
+    async function loadSettings() {
+      try {
+        const res = await fetch(`${API_BASE}/api/settings`);
+        if (!res.ok) return;
+        const s = await res.json();
+
+        // ── Header ────────────────────────────────────────────────
+        if (s.event_name)        $('hdr-eyebrow').textContent = s.event_name;
+        if (s.event_subtitle)    $('hdr-title').textContent   = s.event_subtitle;
+        if (s.event_description) $('hdr-desc').textContent    = s.event_description;
+
+        // ── Prices ────────────────────────────────────────────────
+        const ebPrice  = parseInt(s.early_bird_price || '25', 10);
+        const stdPrice = parseInt(s.standard_price   || '30', 10);
+        PRICES = { 'Early Bird': ebPrice, 'Standard': stdPrice };
+
+        // Update button price labels
+        $('ttb-eb-price').textContent  = `RM${ebPrice}`;
+        $('ttb-std-price').textContent = `RM${stdPrice}`;
+
+        // ── Show dates ────────────────────────────────────────────
+        const grid  = $('show-date-grid');
+        grid.innerHTML = '';
+        const dates = (s.show_dates || '').split(',').map(d => d.trim()).filter(Boolean);
+        dates.forEach(iso => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'show-date-btn';
+          btn.dataset.iso = iso;
+          btn.addEventListener('click', () => selectShowDate(iso));
+          btn.innerHTML = `
+            <span class="sdb-date">${formatShowDateLabel(iso)}</span>
+            <span class="sdb-right">
+              <span class="sdb-remaining"></span>
+              <span class="sdb-soldout-badge">Sold Out</span>
+            </span>`;
+          grid.appendChild(btn);
+        });
+
+        // ── DuitNow info ──────────────────────────────────────────
+        if (s.duitnow_name) $('duitnow-name').textContent = s.duitnow_name;
+        if (s.duitnow_id)   $('duitnow-id').textContent   = s.duitnow_id;
+
+      } catch (err) {
+        console.warn('Could not load settings, using defaults:', err);
+      }
+    }
+
+    // ── Init ─────────────────────────────────────────────────────────
+    loadSettings().then(() => fetchAvailability());
+  </script>
+</body>
+</html>
