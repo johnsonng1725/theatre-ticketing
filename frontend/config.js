@@ -6,7 +6,7 @@
 // PRODUCTION (Netlify)     → replace PRODUCTION_API below with your Render URL
 // ─────────────────────────────────────────────────────────────────────────────
 
-const PRODUCTION_API = 'https://your-backend.onrender.com'; // ← replace before deploying
+const PRODUCTION_API = 'https://theatre-ticketing-api.onrender.com';
 
 (function () {
   const h = window.location.hostname;
