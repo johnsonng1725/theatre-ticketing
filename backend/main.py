@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 DASHBOARD_KEY    = os.environ.get("DASHBOARD_KEY", "admin321")
+FINANCE_KEY      = os.environ.get("FINANCE_KEY",   "finance123")
 SCANNER_KEY      = os.environ.get("SCANNER_KEY",   "admin123")
 _raw_origins     = os.environ.get("CORS_ORIGINS", "*")
 CORS_ORIGINS     = [o.strip() for o in _raw_origins.split(",")] if _raw_origins != "*" else ["*"]
@@ -311,9 +312,14 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 
 def verify_dashboard(x_admin_key: str = Header(..., alias="X-Admin-Key")):
-    """Required by dashboard routes — tickets list and receipt viewer."""
+    """Full admin access — required for write operations (edit, delete, settings)."""
     if x_admin_key != DASHBOARD_KEY:
         raise HTTPException(status_code=401, detail="Invalid dashboard key")
+
+def verify_any_admin(x_admin_key: str = Header(..., alias="X-Admin-Key")):
+    """Read-only admin access — accepts both dashboard and finance keys."""
+    if x_admin_key not in (DASHBOARD_KEY, FINANCE_KEY):
+        raise HTTPException(status_code=401, detail="Invalid key")
 
 def verify_scanner(x_admin_key: str = Header(..., alias="X-Admin-Key")):
     """Required by scanner route — check-in only."""
@@ -332,9 +338,11 @@ def health_check():
 
 @app.get("/api/admin/ping")
 def admin_ping(x_admin_key: str = Header(..., alias="X-Admin-Key")):
-    """Key verification endpoint — returns role so the frontend knows which key was accepted."""
+    """Key verification — returns role so the frontend knows what access level was granted."""
     if x_admin_key == DASHBOARD_KEY:
         return {"ok": True, "role": "dashboard"}
+    if x_admin_key == FINANCE_KEY:
+        return {"ok": True, "role": "finance"}
     if x_admin_key == SCANNER_KEY:
         return {"ok": True, "role": "scanner"}
     raise HTTPException(status_code=401, detail="Invalid key")
@@ -477,7 +485,7 @@ def register_ticket(
 @app.get(
     "/api/admin/tickets",
     response_model=schemas.TicketListResponse,
-    dependencies=[Depends(verify_dashboard)],
+    dependencies=[Depends(verify_any_admin)],
 )
 def get_tickets(db: Session = Depends(get_db)):
     tickets = (
@@ -497,7 +505,7 @@ def get_tickets(db: Session = Depends(get_db)):
 
 @app.get(
     "/api/admin/receipt/{ticket_id}",
-    dependencies=[Depends(verify_dashboard)],
+    dependencies=[Depends(verify_any_admin)],
 )
 def get_receipt(ticket_id: str, db: Session = Depends(get_db)):
     """Return the base64 receipt data for a single ticket."""

@@ -101,6 +101,18 @@
     .live-badge.stale { color: var(--error); background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); }
     .live-badge.stale .live-dot { background: var(--error); animation: none; }
 
+    /* Role badge */
+    .role-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      padding: 0.3rem 0.7rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+    }
+    .role-badge.admin   { background: rgba(212,175,55,0.15); color: var(--gold); border: 1px solid rgba(212,175,55,0.4); }
+    .role-badge.finance { background: rgba(99,179,237,0.15); color: #63b3ed;     border: 1px solid rgba(99,179,237,0.4); }
+
     /* ── Main content ───────────────────────────────────────── */
     main {
       max-width: 1100px;
@@ -908,7 +920,8 @@
         <a href="index.html">Registration</a>
         <a href="admin-scanner.html">Scanner</a>
       </div>
-      <button class="btn-settings" onclick="openSettingsModal()" title="Event Settings">⚙️</button>
+      <span class="role-badge" id="role-badge" style="display:none"></span>
+      <button class="btn-settings" id="btn-settings" onclick="openSettingsModal()" title="Event Settings">⚙️</button>
       <div class="live-badge" id="live-badge">
         <div class="live-dot"></div>
         <span id="live-text">Live</span>
@@ -1229,9 +1242,11 @@
     // API_BASE is defined in config.js — edit that file to change the backend URL.
     const REFRESH_MS     = 5000; // auto-refresh interval
     const SESSION_KEY    = 'theatre_dashboard_key';
+    const ROLE_KEY       = 'theatre_dashboard_role';
 
     // ── State ────────────────────────────────────────────────
     let adminKey   = sessionStorage.getItem(SESSION_KEY) || '';
+    let userRole   = sessionStorage.getItem(ROLE_KEY)    || '';
     let allTickets = [];
     let refreshTimer;
 
@@ -1294,6 +1309,7 @@
         $('login-modal').classList.remove('hidden');
       } else {
         $('login-modal').classList.add('hidden');
+        applyRoleUI();
         startDashboard();
       }
     }
@@ -1319,19 +1335,40 @@
         }
         if (!res.ok) throw new Error('Server error');
         const data = await res.json();
-        if (data.role !== 'dashboard') {
+        if (data.role !== 'dashboard' && data.role !== 'finance') {
           $('modal-error').textContent = 'This key does not have dashboard access.';
           $('modal-error').classList.add('visible');
           return;
         }
         adminKey = key;
+        userRole = data.role;
         sessionStorage.setItem(SESSION_KEY, key);
+        sessionStorage.setItem(ROLE_KEY, data.role);
         $('modal-error').classList.remove('visible');
         $('login-modal').classList.add('hidden');
+        applyRoleUI();
         startDashboard();
       } catch {
         $('modal-error').textContent = 'Could not reach the server. Check your network.';
         $('modal-error').classList.add('visible');
+      }
+    }
+
+    // ── Role-based UI ─────────────────────────────────────────
+    function applyRoleUI() {
+      const badge    = $('role-badge');
+      const settings = $('btn-settings');
+
+      if (userRole === 'finance') {
+        badge.textContent = 'Finance';
+        badge.className   = 'role-badge finance';
+        badge.style.display = '';
+        settings.style.display = 'none'; // finance cannot change settings
+      } else if (userRole === 'dashboard') {
+        badge.textContent = 'Admin';
+        badge.className   = 'role-badge admin';
+        badge.style.display = '';
+        settings.style.display = ''; // admin can access settings
       }
     }
 
@@ -1352,7 +1389,9 @@
           // Key expired / invalid — force re-login
           clearInterval(refreshTimer);
           sessionStorage.removeItem(SESSION_KEY);
+          sessionStorage.removeItem(ROLE_KEY);
           adminKey = '';
+          userRole = '';
           $('login-modal').classList.remove('hidden');
           return;
         }
@@ -1424,9 +1463,10 @@
 
         const typeChip = `<span class="type-chip${typeClass}">${escape(t.ticket_type)}</span>`;
 
-        const actionBtns = `
-          <button class="btn-edit"   onclick="openEditModal('${escape(t.ticket_id)}')">Edit</button>
-          <button class="btn-delete" onclick="openDeleteModal('${escape(t.ticket_id)}', '${escape(t.name)}')">Delete</button>`;
+        const actionBtns = userRole === 'finance'
+          ? `<span style="color:var(--text-muted);font-size:0.78rem">—</span>`
+          : `<button class="btn-edit"   onclick="openEditModal('${escape(t.ticket_id)}')">Edit</button>
+             <button class="btn-delete" onclick="openDeleteModal('${escape(t.ticket_id)}', '${escape(t.name)}')">Delete</button>`;
 
         return `<tr>
           <td>${escape(t.name)}</td>
@@ -1498,6 +1538,7 @@
 
     // ── Settings modal ───────────────────────────────────────
     async function openSettingsModal() {
+      if (userRole !== 'dashboard') return; // finance role: no settings access
       // Load current settings from API
       try {
         const res = await fetch(`${API_BASE}/api/settings`);
