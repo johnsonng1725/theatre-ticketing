@@ -36,3 +36,15 @@ class Ticket(Base):
         server_default=func.now(),
         nullable=False
     )
+
+
+# ── Audit log ────────────────────────────────────────────────────────────────
+class AuditLog(Base):
+    """Records every significant admin action for backstage visibility."""
+    __tablename__ = "audit_logs"
+
+    id        = Column(Integer,  primary_key=True, autoincrement=True)
+    timestamp = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    role      = Column(String(20),  nullable=False)   # Admin | Finance | Scanner
+    action    = Column(String(50),  nullable=False)   # login | edit_ticket | delete_ticket | update_settings | checkin
+    detail    = Column(Text,        nullable=False)

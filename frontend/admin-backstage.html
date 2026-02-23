@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Backstage — Immersive Theatre</title>
+
+  <style>
+    /* ── Design tokens ──────────────────────────────────────── */
+    :root {
+      --bg:        #0a0a0f;
+      --surface:   #12121e;
+      --card:      #1a1a2e;
+      --border:    #2a2a45;
+      --gold:      #d4af37;
+      --purple:    #8b5cf6;
+      --text:      #e8e8f0;
+      --text-muted:#8888aa;
+      --success:   #10b981;
+      --warning:   #f59e0b;
+      --error:     #ef4444;
+      --radius:    12px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Top nav ────────────────────────────────────────────── */
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .nav-brand { display: flex; align-items: center; gap: 0.75rem; }
+    .nav-brand .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--gold);
+      box-shadow: 0 0 8px var(--gold);
+    }
+    .nav-brand span { font-weight: 700; font-size: 1rem; letter-spacing: 0.04em; color: var(--gold); }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      padding: 0.4rem 0.7rem;
+      border-radius: 6px;
+      transition: color 0.2s, background 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); background: var(--card); }
+    .nav-links a.active { color: var(--gold); }
+
+    .live-badge {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.75rem; color: var(--success);
+      background: rgba(16,185,129,0.1);
+      border: 1px solid rgba(16,185,129,0.3);
+      padding: 0.3rem 0.7rem;
+      border-radius: 999px;
+    }
+    .live-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .live-badge.stale { color: var(--error); background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); }
+    .live-badge.stale .live-dot { background: var(--error); animation: none; }
+
+    /* ── Main ───────────────────────────────────────────────── */
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    .page-title { margin-bottom: 2rem; }
+    .page-title h1 { font-size: 1.6rem; font-weight: 700; }
+    .page-title p  { color: var(--text-muted); font-size: 0.9rem; margin-top: 0.3rem; }
+
+    /* ── Summary chips ──────────────────────────────────────── */
+    .summary-row {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+    }
+    .summary-chip {
+      display: flex; align-items: center; gap: 0.5rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 0.35rem 0.9rem;
+      font-size: 0.8rem;
+    }
+    .summary-chip .chip-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+    }
+    .summary-chip .chip-count { font-weight: 700; color: var(--text); }
+    .summary-chip .chip-label { color: var(--text-muted); }
+
+    /* ── Table card ─────────────────────────────────────────── */
+    .table-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .table-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .table-header h2 { font-size: 1rem; font-weight: 600; }
+
+    /* Filter chips */
+    .filter-row {
+      display: flex; gap: 0.5rem; flex-wrap: wrap;
+    }
+    .filter-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      padding: 0.3rem 0.75rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .filter-btn:hover { color: var(--text); border-color: var(--text-muted); }
+    .filter-btn.active { color: var(--gold); border-color: var(--gold); background: rgba(212,175,55,0.08); }
+
+    .table-scroll { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+    thead th {
+      background: var(--surface);
+      padding: 0.75rem 1.25rem;
+      text-align: left;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    tbody tr {
+      border-top: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+    tbody tr:hover { background: rgba(255,255,255,0.02); }
+    td { padding: 0.85rem 1.25rem; vertical-align: middle; }
+
+    /* Role badge */
+    .role-chip {
+      display: inline-block;
+      padding: 0.2rem 0.65rem;
+      border-radius: 999px;
+      font-size: 0.73rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .role-chip.admin   { background: rgba(212,175,55,0.15); color: var(--gold);    border: 1px solid rgba(212,175,55,0.35); }
+    .role-chip.finance { background: rgba(99,179,237,0.15); color: #63b3ed;         border: 1px solid rgba(99,179,237,0.35); }
+    .role-chip.scanner { background: rgba(139,92,246,0.15); color: var(--purple);  border: 1px solid rgba(139,92,246,0.35); }
+
+    /* Action badge */
+    .action-chip {
+      display: inline-block;
+      padding: 0.2rem 0.65rem;
+      border-radius: 6px;
+      font-size: 0.73rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .action-chip.login           { background: rgba(16,185,129,0.1);  color: var(--success); }
+    .action-chip.edit_ticket     { background: rgba(245,158,11,0.1);  color: var(--warning); }
+    .action-chip.delete_ticket   { background: rgba(239,68,68,0.1);   color: var(--error);   }
+    .action-chip.update_settings { background: rgba(139,92,246,0.1);  color: var(--purple);  }
+    .action-chip.checkin         { background: rgba(99,179,237,0.1);  color: #63b3ed;        }
+
+    /* Detail cell */
+    .detail-cell {
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      max-width: 480px;
+      word-break: break-word;
+      white-space: normal;
+    }
+
+    /* Timestamp */
+    .ts-cell { white-space: nowrap; font-size: 0.8rem; color: var(--text-muted); }
+
+    /* Empty / loading */
+    .table-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-muted);
+    }
+    .table-state p { margin-top: 0.5rem; font-size: 0.9rem; }
+
+    /* Error banner */
+    #error-banner {
+      display: none;
+      background: rgba(239,68,68,0.1);
+      border: 1px solid var(--error);
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      color: var(--error);
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+    }
+    #error-banner.visible { display: block; }
+
+    /* ── Login modal ────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100; padding: 1rem;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2rem; width: 100%; max-width: 380px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.8);
+    }
+    .modal-title  { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .modal-sub    { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.5rem; }
+    .modal label  {
+      display: block; font-size: 0.78rem; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 0.4rem;
+    }
+    .modal input {
+      width: 100%; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 1rem;
+      padding: 0.75rem 1rem; outline: none; margin-bottom: 0.75rem;
+    }
+    .modal input:focus { border-color: var(--gold); }
+    .modal-error { color: var(--error); font-size: 0.82rem; margin-bottom: 0.75rem; display: none; }
+    .modal-error.visible { display: block; }
+    .btn-modal {
+      width: 100%; padding: 0.8rem; background: var(--gold);
+      border: none; border-radius: 8px; color: #0a0a0f;
+      font-weight: 700; font-size: 0.95rem; cursor: pointer;
+    }
+    .btn-modal:hover { opacity: 0.9; }
+
+    @media (max-width: 600px) {
+      .nav-links { display: none; }
+      .table-header { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Login modal ────────────────────────────────────────── -->
+  <div class="modal-overlay" id="login-modal">
+    <div class="modal">
+      <p class="modal-title">Backstage Access</p>
+      <p class="modal-sub">Admin key required to view activity logs.</p>
+      <label for="modal-key">Admin Key</label>
+      <input type="password" id="modal-key" placeholder="Paste your admin key…" autocomplete="off" />
+      <p class="modal-error" id="modal-error">Incorrect key or insufficient permissions.</p>
+      <button class="btn-modal" id="modal-submit">Unlock Backstage</button>
+    </div>
+  </div>
+
+  <!-- ── Navigation ─────────────────────────────────────────── -->
+  <nav>
+    <div class="nav-brand">
+      <div class="dot"></div>
+      <span>Theatre Admin</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:1rem;">
+      <div class="nav-links">
+        <a href="index.html">Registration</a>
+        <a href="admin-dashboard.html">Dashboard</a>
+        <a href="admin-scanner.html">Scanner</a>
+        <a href="admin-backstage.html" class="active">Backstage</a>
+      </div>
+      <div class="live-badge" id="live-badge">
+        <div class="live-dot"></div>
+        <span id="live-text">Live</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Main ───────────────────────────────────────────────── -->
+  <main>
+
+    <div class="page-title">
+      <h1>🎭 Backstage</h1>
+      <p id="last-refresh">Fetching activity log…</p>
+    </div>
+
+    <div id="error-banner"></div>
+
+    <!-- Summary chips -->
+    <div class="summary-row" id="summary-row"></div>
+
+    <!-- Activity table -->
+    <div class="table-card">
+      <div class="table-header">
+        <h2>Activity Log</h2>
+        <div class="filter-row" id="filter-row">
+          <button class="filter-btn active" data-filter="all"  onclick="setFilter('all')">All</button>
+          <button class="filter-btn" data-filter="login"          onclick="setFilter('login')">Logins</button>
+          <button class="filter-btn" data-filter="edit_ticket"    onclick="setFilter('edit_ticket')">Edits</button>
+          <button class="filter-btn" data-filter="delete_ticket"  onclick="setFilter('delete_ticket')">Deletes</button>
+          <button class="filter-btn" data-filter="update_settings" onclick="setFilter('update_settings')">Settings</button>
+          <button class="filter-btn" data-filter="checkin"        onclick="setFilter('checkin')">Check-ins</button>
+        </div>
+      </div>
+
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Role</th>
+              <th>Action</th>
+              <th>Detail</th>
+            </tr>
+          </thead>
+          <tbody id="log-tbody">
+            <tr><td colspan="4"><div class="table-state"><p>Loading…</p></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="./config.js"></script>
+  <script>
+    const REFRESH_MS  = 10000;
+    const SESSION_KEY = 'theatre_backstage_key';
+
+    let adminKey     = sessionStorage.getItem(SESSION_KEY) || '';
+    let allEntries   = [];
+    let activeFilter = 'all';
+    let refreshTimer;
+
+    const $ = id => document.getElementById(id);
+
+    // ── Helpers ──────────────────────────────────────────────
+    function showError(msg) {
+      const el = $('error-banner');
+      el.textContent = msg;
+      el.classList.add('visible');
+    }
+    function clearError() { $('error-banner').classList.remove('visible'); }
+
+    function setLive(ok) {
+      const badge = $('live-badge');
+      const text  = $('live-text');
+      if (ok) { badge.classList.remove('stale'); text.textContent = 'Live'; }
+      else     { badge.classList.add('stale');    text.textContent = 'Stale'; }
+    }
+
+    function formatDateTime(iso) {
+      if (!iso) return '—';
+      return new Date(iso).toLocaleString('en-GB', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+
+    function roleClass(role) {
+      const r = (role || '').toLowerCase();
+      if (r === 'admin')   return 'admin';
+      if (r === 'finance') return 'finance';
+      if (r === 'scanner') return 'scanner';
+      return 'finance';
+    }
+
+    function actionLabel(action) {
+      const map = {
+        login:           'Login',
+        edit_ticket:     'Edit Ticket',
+        delete_ticket:   'Delete Ticket',
+        update_settings: 'Settings Change',
+        checkin:         'Check-in',
+      };
+      return map[action] || action;
+    }
+
+    // ── Login ─────────────────────────────────────────────────
+    function maybeShowLogin() {
+      if (!adminKey) {
+        $('login-modal').classList.remove('hidden');
+      } else {
+        $('login-modal').classList.add('hidden');
+        startBackstage();
+      }
+    }
+
+    $('modal-submit').addEventListener('click', attemptLogin);
+    $('modal-key').addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
+
+    async function attemptLogin() {
+      const key = $('modal-key').value.trim();
+      if (!key) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/ping`, {
+          headers: { 'X-Admin-Key': key }
+        });
+        if (res.status === 401) {
+          $('modal-error').textContent = 'Incorrect key — please try again.';
+          $('modal-error').classList.add('visible');
+          return;
+        }
+        if (!res.ok) throw new Error('Server error');
+        const data = await res.json();
+        if (data.role !== 'dashboard') {
+          $('modal-error').textContent = 'Backstage requires the Admin key.';
+          $('modal-error').classList.add('visible');
+          return;
+        }
+        adminKey = key;
+        sessionStorage.setItem(SESSION_KEY, key);
+        $('modal-error').classList.remove('visible');
+        $('login-modal').classList.add('hidden');
+        startBackstage();
+      } catch {
+        $('modal-error').textContent = 'Could not reach the server. Check your network.';
+        $('modal-error').classList.add('visible');
+      }
+    }
+
+    // ── Data ──────────────────────────────────────────────────
+    function startBackstage() {
+      fetchLog();
+      refreshTimer = setInterval(fetchLog, REFRESH_MS);
+    }
+
+    async function fetchLog() {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/audit`, {
+          headers: { 'X-Admin-Key': adminKey }
+        });
+        if (res.status === 401) {
+          clearInterval(refreshTimer);
+          sessionStorage.removeItem(SESSION_KEY);
+          adminKey = '';
+          $('login-modal').classList.remove('hidden');
+          return;
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        clearError();
+        setLive(true);
+        allEntries = data.entries;
+        renderSummary();
+        renderTable();
+        $('last-refresh').textContent = `Last updated: ${new Date().toLocaleTimeString('en-GB')}`;
+      } catch (err) {
+        showError('Failed to fetch activity log. Retrying…');
+        setLive(false);
+      }
+    }
+
+    // ── Summary chips ─────────────────────────────────────────
+    function renderSummary() {
+      const counts = {};
+      allEntries.forEach(e => {
+        counts[e.action] = (counts[e.action] || 0) + 1;
+      });
+
+      const defs = [
+        { action: 'login',           label: 'Logins',          color: '#10b981' },
+        { action: 'checkin',         label: 'Check-ins',       color: '#63b3ed' },
+        { action: 'edit_ticket',     label: 'Edits',           color: '#f59e0b' },
+        { action: 'delete_ticket',   label: 'Deletes',         color: '#ef4444' },
+        { action: 'update_settings', label: 'Settings changes',color: '#8b5cf6' },
+      ];
+
+      $('summary-row').innerHTML = defs.map(d => `
+        <div class="summary-chip">
+          <span class="chip-dot" style="background:${d.color}"></span>
+          <span class="chip-count">${counts[d.action] || 0}</span>
+          <span class="chip-label">${d.label}</span>
+        </div>`).join('');
+    }
+
+    // ── Filter ────────────────────────────────────────────────
+    function setFilter(f) {
+      activeFilter = f;
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === f);
+      });
+      renderTable();
+    }
+
+    // ── Table ─────────────────────────────────────────────────
+    function renderTable() {
+      const tbody = $('log-tbody');
+      const rows  = activeFilter === 'all'
+        ? allEntries
+        : allEntries.filter(e => e.action === activeFilter);
+
+      if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4"><div class="table-state">
+          <p>${activeFilter === 'all' ? 'No activity recorded yet.' : 'No entries for this filter.'}</p>
+        </div></td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = rows.map(e => `
+        <tr>
+          <td class="ts-cell">${formatDateTime(e.timestamp)}</td>
+          <td><span class="role-chip ${roleClass(e.role)}">${e.role}</span></td>
+          <td><span class="action-chip ${e.action}">${actionLabel(e.action)}</span></td>
+          <td class="detail-cell">${escapeHtml(e.detail)}</td>
+        </tr>`).join('');
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // ── Boot ──────────────────────────────────────────────────
+    maybeShowLogin();
+  </script>
+</body>
+</html>

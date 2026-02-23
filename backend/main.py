@@ -294,6 +294,18 @@ def _send_ticket_email(ticket, settings: dict) -> None:
         )
 
 
+# ── Audit log helper ──────────────────────────────────────────────────────────
+
+def _log_action(db: Session, role: str, action: str, detail: str) -> None:
+    """Insert one audit-log row. Failures are swallowed so they never break the main flow."""
+    try:
+        entry = models.AuditLog(role=role, action=action, detail=detail)
+        db.add(entry)
+        db.commit()
+    except Exception as exc:
+        logger.warning("Audit log write failed: %s", exc)
+
+
 # ── FastAPI app ───────────────────────────────────────────────────────────────
 
 app = FastAPI(title="Theatre Ticketing API", version="1.0.0")
@@ -337,13 +349,19 @@ def health_check():
 
 
 @app.get("/api/admin/ping")
-def admin_ping(x_admin_key: str = Header(..., alias="X-Admin-Key")):
+def admin_ping(
+    x_admin_key: str = Header(..., alias="X-Admin-Key"),
+    db: Session = Depends(get_db),
+):
     """Key verification — returns role so the frontend knows what access level was granted."""
     if x_admin_key == DASHBOARD_KEY:
+        _log_action(db, "Admin", "login", "Logged in as Admin (full access)")
         return {"ok": True, "role": "dashboard"}
     if x_admin_key == FINANCE_KEY:
+        _log_action(db, "Finance", "login", "Logged in as Finance (view only)")
         return {"ok": True, "role": "finance"}
     if x_admin_key == SCANNER_KEY:
+        _log_action(db, "Scanner", "login", "Logged in as Scanner (view only)")
         return {"ok": True, "role": "finance"}   # scanner key gets read-only dashboard access
     raise HTTPException(status_code=401, detail="Invalid key")
 
@@ -361,15 +379,21 @@ def get_settings(db: Session = Depends(get_db)):
 def update_settings(payload: dict, db: Session = Depends(get_db)):
     """Save updated event settings (dashboard key required)."""
     allowed_keys = set(SETTING_DEFAULTS.keys())
+    changed = []
     for key, value in payload.items():
         if key not in allowed_keys:
             continue
         row = db.query(models.Setting).filter(models.Setting.key == key).first()
         if row:
+            if row.value != str(value):
+                changed.append(f"{key}='{value}'")
             row.value = str(value)
         else:
             db.add(models.Setting(key=key, value=str(value)))
+            changed.append(f"{key}='{value}'")
     db.commit()
+    if changed:
+        _log_action(db, "Admin", "update_settings", "Updated settings: " + ", ".join(changed))
     return get_all_settings(db)
 
 
@@ -544,23 +568,37 @@ def update_ticket(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found.")
 
-    if update.name is not None:
+    changes = []
+    if update.name is not None and update.name.strip() != ticket.name:
+        changes.append(f"name: '{ticket.name}' → '{update.name.strip()}'")
         ticket.name = update.name.strip()
-    if update.email is not None:
+    if update.email is not None and update.email.strip().lower() != ticket.email:
+        changes.append(f"email: '{ticket.email}' → '{update.email.strip().lower()}'")
         ticket.email = update.email.strip().lower()
-    if update.phone is not None:
+    if update.phone is not None and update.phone.strip() != ticket.phone:
+        changes.append(f"phone: '{ticket.phone}' → '{update.phone.strip()}'")
         ticket.phone = update.phone.strip()
-    if update.ticket_type is not None:
+    if update.ticket_type is not None and update.ticket_type != ticket.ticket_type:
+        changes.append(f"ticket_type: '{ticket.ticket_type}' → '{update.ticket_type}'")
         ticket.ticket_type = update.ticket_type
-    if update.show_date is not None:
+    if update.show_date is not None and update.show_date != ticket.show_date:
+        changes.append(f"show_date: '{ticket.show_date}' → '{update.show_date}'")
         ticket.show_date = update.show_date
-    if update.quantity is not None:
+    if update.quantity is not None and update.quantity != ticket.quantity:
+        changes.append(f"quantity: {ticket.quantity} → {update.quantity}")
         ticket.quantity = update.quantity
-    if update.payment_status is not None:
+    if update.payment_status is not None and update.payment_status != ticket.payment_status:
+        changes.append(f"payment_status: '{ticket.payment_status}' → '{update.payment_status}'")
         ticket.payment_status = update.payment_status
 
     db.commit()
     db.refresh(ticket)
+
+    detail = f"Edited ticket for {ticket.name} (ID: {ticket_id[:8]}…)"
+    if changes:
+        detail += " — " + ", ".join(changes)
+    _log_action(db, "Admin", "edit_ticket", detail)
+
     return ticket
 
 
@@ -578,8 +616,14 @@ def delete_ticket(ticket_id: str, db: Session = Depends(get_db)):
     )
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found.")
+    detail = (
+        f"Deleted ticket for {ticket.name} ({ticket.email}) — "
+        f"{ticket.show_date}, {ticket.ticket_type} x{ticket.quantity} "
+        f"(ID: {ticket_id[:8]}…)"
+    )
     db.delete(ticket)
     db.commit()
+    _log_action(db, "Admin", "delete_ticket", detail)
     return Response(status_code=204)
 
 
@@ -617,8 +661,43 @@ def checkin_ticket(
     db.commit()
     db.refresh(ticket)
 
+    _log_action(
+        db, "Scanner", "checkin",
+        f"Checked in {ticket.name} ({ticket.show_date}, {ticket.ticket_type} x{ticket.quantity})"
+    )
+
     return schemas.CheckinResponse(
         success=True,
         message=f"Welcome, {ticket.name}!",
         ticket=ticket,
     )
+
+
+# ---------------------------------------------------------------------------
+# Backstage / Audit log  (admin only)
+# ---------------------------------------------------------------------------
+
+@app.get(
+    "/api/admin/audit",
+    dependencies=[Depends(verify_dashboard)],
+)
+def get_audit_log(db: Session = Depends(get_db), limit: int = 200):
+    """Return the most recent audit log entries (dashboard key required)."""
+    entries = (
+        db.query(models.AuditLog)
+        .order_by(models.AuditLog.timestamp.desc())
+        .limit(limit)
+        .all()
+    )
+    return {
+        "entries": [
+            {
+                "id":        e.id,
+                "timestamp": e.timestamp.isoformat() if e.timestamp else None,
+                "role":      e.role,
+                "action":    e.action,
+                "detail":    e.detail,
+            }
+            for e in entries
+        ]
+    }
