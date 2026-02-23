@@ -740,11 +740,141 @@
     }
     .btn-cancel-edit:hover { color: var(--text); }
 
+    /* ── Analytics section ──────────────────────────────────── */
+    .analytics-section-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--gold);
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 1rem;
+    }
+    .analytics-section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .analytics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .analytics-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+    }
+    .analytics-card.wide { grid-column: 1 / -1; }
+
+    .analytics-card-title {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 1.1rem;
+    }
+
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+    .bar-row:last-child { margin-bottom: 0; }
+
+    .bar-label {
+      font-size: 0.8rem;
+      color: var(--text);
+      width: 110px;
+      flex-shrink: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .bar-track {
+      flex: 1;
+      background: var(--border);
+      border-radius: 999px;
+      height: 7px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.6s ease;
+      min-width: 2px;
+    }
+
+    .bar-count {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      width: 82px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* Revenue cards inside analytics */
+    .revenue-items {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+    .revenue-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .revenue-item::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+    }
+    .revenue-item.collected::before { background: var(--success); }
+    .revenue-item.rev-pending::before  { background: var(--warning); }
+    .revenue-item.rev-total::before    { background: var(--gold); }
+
+    .rev-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      display: block;
+      margin-bottom: 0.5rem;
+    }
+    .rev-amount {
+      font-size: 1.55rem;
+      font-weight: 800;
+      display: block;
+      line-height: 1;
+    }
+    .revenue-item.collected  .rev-amount { color: var(--success); }
+    .revenue-item.rev-pending   .rev-amount { color: var(--warning); }
+    .revenue-item.rev-total     .rev-amount { color: var(--gold); }
+
     /* ── Misc ───────────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .analytics-grid { grid-template-columns: 1fr 1fr; }
+      .revenue-items  { grid-template-columns: 1fr 1fr 1fr; }
+    }
     @media (max-width: 600px) {
       .table-header { flex-direction: column; align-items: flex-start; }
       .nav-links { display: none; }
       .edit-modal-body { grid-template-columns: 1fr; }
+      .analytics-grid { grid-template-columns: 1fr; }
+      .revenue-items  { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -824,6 +954,55 @@
       <div class="progress-bar-bg">
         <div class="progress-bar-fill" id="progress-fill"></div>
       </div>
+    </div>
+
+    <!-- Analytics -->
+    <p class="analytics-section-label">Analytics</p>
+    <div class="analytics-grid">
+
+      <!-- Sales by show date -->
+      <div class="analytics-card">
+        <p class="analytics-card-title">Sales by Show Date</p>
+        <div id="analytics-dates">
+          <p style="color:var(--text-muted);font-size:0.85rem">No data yet</p>
+        </div>
+      </div>
+
+      <!-- Ticket type split -->
+      <div class="analytics-card">
+        <p class="analytics-card-title">Ticket Type Split</p>
+        <div id="analytics-types">
+          <p style="color:var(--text-muted);font-size:0.85rem">No data yet</p>
+        </div>
+      </div>
+
+      <!-- Payment status -->
+      <div class="analytics-card">
+        <p class="analytics-card-title">Payment Status</p>
+        <div id="analytics-payment">
+          <p style="color:var(--text-muted);font-size:0.85rem">No data yet</p>
+        </div>
+      </div>
+
+      <!-- Revenue estimate -->
+      <div class="analytics-card wide">
+        <p class="analytics-card-title">Revenue Estimate</p>
+        <div class="revenue-items" id="analytics-revenue">
+          <div class="revenue-item collected">
+            <span class="rev-label">Collected (Receipt)</span>
+            <span class="rev-amount" style="color:var(--text-muted)">—</span>
+          </div>
+          <div class="revenue-item rev-pending">
+            <span class="rev-label">Pending</span>
+            <span class="rev-amount" style="color:var(--text-muted)">—</span>
+          </div>
+          <div class="revenue-item rev-total">
+            <span class="rev-label">Total Expected</span>
+            <span class="rev-amount" style="color:var(--text-muted)">—</span>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <!-- Ticket table -->
@@ -1158,6 +1337,7 @@
 
     // ── Dashboard ────────────────────────────────────────────
     function startDashboard() {
+      fetchPrices();
       fetchTickets();
       refreshTimer = setInterval(fetchTickets, REFRESH_MS);
     }
@@ -1185,6 +1365,7 @@
         allTickets = data.tickets;
         updateStats(data.total, data.total_tickets, data.checked_in);
         renderTable($('search-input').value.trim().toLowerCase());
+        updateAnalytics();
         $('last-refresh').textContent = `Last updated: ${new Date().toLocaleTimeString('en-GB')}`;
 
       } catch (err) {
@@ -1538,6 +1719,114 @@
     $('delete-modal').addEventListener('click', e => {
       if (e.target === $('delete-modal')) closeDeleteModal();
     });
+
+    // ── Analytics ────────────────────────────────────────────
+    let cachedPrices = { 'Early Bird': 0, 'Standard': 0 };
+
+    async function fetchPrices() {
+      try {
+        const res = await fetch(`${API_BASE}/api/settings`);
+        if (!res.ok) return;
+        const s = await res.json();
+        cachedPrices['Early Bird'] = parseFloat(s.early_bird_price) || 0;
+        cachedPrices['Standard']   = parseFloat(s.standard_price)   || 0;
+      } catch {}
+    }
+
+    function updateAnalytics() {
+      if (!allTickets.length) return;
+
+      const byDate    = {};
+      const byType    = {};
+      let   payIn     = 0,  payPend    = 0;
+      let   revenueIn = 0,  revenuePend = 0;
+
+      allTickets.forEach(t => {
+        const qty   = t.quantity || 1;
+        const price = cachedPrices[t.ticket_type] || 0;
+
+        // Sales by date
+        byDate[t.show_date] = (byDate[t.show_date] || 0) + qty;
+
+        // Ticket type split
+        byType[t.ticket_type] = (byType[t.ticket_type] || 0) + qty;
+
+        // Payment & revenue
+        if (t.payment_status === 'receipt_uploaded') {
+          payIn      += qty;
+          revenueIn  += price * qty;
+        } else {
+          payPend    += qty;
+          revenuePend += price * qty;
+        }
+      });
+
+      const grandTotal = Object.values(byDate).reduce((a, b) => a + b, 0);
+      const hasPrices  = cachedPrices['Early Bird'] > 0 || cachedPrices['Standard'] > 0;
+
+      // ── Sales by date ──
+      const maxD = Math.max(...Object.values(byDate), 1);
+      $('analytics-dates').innerHTML = Object.entries(byDate).sort().map(([d, n]) => `
+        <div class="bar-row">
+          <span class="bar-label" title="${d}">${formatDate(d)}</span>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${(n / maxD * 100).toFixed(1)}%;background:var(--purple)"></div>
+          </div>
+          <span class="bar-count">${n} tickets</span>
+        </div>`).join('');
+
+      // ── Ticket type split ──
+      const typeColors = { 'Early Bird': 'var(--gold)', 'Standard': 'var(--purple)' };
+      const maxT = Math.max(...Object.values(byType), 1);
+      $('analytics-types').innerHTML = Object.entries(byType).map(([type, n]) => {
+        const pct   = grandTotal > 0 ? Math.round(n / grandTotal * 100) : 0;
+        const color = typeColors[type] || 'var(--text-muted)';
+        return `
+          <div class="bar-row">
+            <span class="bar-label">${type}</span>
+            <div class="bar-track">
+              <div class="bar-fill" style="width:${(n / maxT * 100).toFixed(1)}%;background:${color}"></div>
+            </div>
+            <span class="bar-count">${n} (${pct}%)</span>
+          </div>`;
+      }).join('');
+
+      // ── Payment status ──
+      const totalPay = payIn + payPend;
+      const pctIn    = totalPay > 0 ? Math.round(payIn / totalPay * 100) : 0;
+      $('analytics-payment').innerHTML = `
+        <div class="bar-row">
+          <span class="bar-label">Receipt</span>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${pctIn}%;background:var(--success)"></div>
+          </div>
+          <span class="bar-count">${payIn} (${pctIn}%)</span>
+        </div>
+        <div class="bar-row">
+          <span class="bar-label">Pending</span>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${100 - pctIn}%;background:var(--warning)"></div>
+          </div>
+          <span class="bar-count">${payPend} (${100 - pctIn}%)</span>
+        </div>`;
+
+      // ── Revenue ──
+      const revTotal = revenueIn + revenuePend;
+      const fmt      = n => hasPrices ? `RM ${n.toFixed(0)}` : '—';
+      $('analytics-revenue').innerHTML = `
+        <div class="revenue-item collected">
+          <span class="rev-label">Collected (Receipt)</span>
+          <span class="rev-amount">${fmt(revenueIn)}</span>
+        </div>
+        <div class="revenue-item rev-pending">
+          <span class="rev-label">Pending</span>
+          <span class="rev-amount">${fmt(revenuePend)}</span>
+        </div>
+        <div class="revenue-item rev-total">
+          <span class="rev-label">Total Expected</span>
+          <span class="rev-amount">${fmt(revTotal)}</span>
+        </div>`;
+    }
 
     // ── Live search ──────────────────────────────────────────
     $('search-input').addEventListener('input', e => {
