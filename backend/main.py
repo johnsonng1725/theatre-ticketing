@@ -317,8 +317,8 @@ def verify_dashboard(x_admin_key: str = Header(..., alias="X-Admin-Key")):
         raise HTTPException(status_code=401, detail="Invalid dashboard key")
 
 def verify_any_admin(x_admin_key: str = Header(..., alias="X-Admin-Key")):
-    """Read-only admin access — accepts both dashboard and finance keys."""
-    if x_admin_key not in (DASHBOARD_KEY, FINANCE_KEY):
+    """Read-only admin access — accepts dashboard, finance, and scanner keys."""
+    if x_admin_key not in (DASHBOARD_KEY, FINANCE_KEY, SCANNER_KEY):
         raise HTTPException(status_code=401, detail="Invalid key")
 
 def verify_scanner(x_admin_key: str = Header(..., alias="X-Admin-Key")):
@@ -344,7 +344,7 @@ def admin_ping(x_admin_key: str = Header(..., alias="X-Admin-Key")):
     if x_admin_key == FINANCE_KEY:
         return {"ok": True, "role": "finance"}
     if x_admin_key == SCANNER_KEY:
-        return {"ok": True, "role": "scanner"}
+        return {"ok": True, "role": "finance"}   # scanner key gets read-only dashboard access
     raise HTTPException(status_code=401, detail="Invalid key")
 
 
