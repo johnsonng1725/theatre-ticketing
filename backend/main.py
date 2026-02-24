@@ -1,12 +1,11 @@
 import os
+import json
+import base64
 import secrets
 import logging
 import io
-import smtplib
+import urllib.request
 from datetime import datetime, date
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.image import MIMEImage
 
 from fastapi import FastAPI, HTTPException, Depends, Header, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,14 +32,11 @@ BACKSTAGE_KEY    = os.environ.get("BACKSTAGE_KEY",  "admin")
 _raw_origins     = os.environ.get("CORS_ORIGINS", "*")
 CORS_ORIGINS     = [o.strip() for o in _raw_origins.split(",")] if _raw_origins != "*" else ["*"]
 
-# ── SMTP email config ─────────────────────────────────────────────────────────
-# Set these in your .env to enable confirmation emails.
-# Leave SMTP_USER / SMTP_PASS blank to disable email (registration still works).
-SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
-SMTP_USER = os.environ.get("SMTP_USER", "")
-SMTP_PASS = os.environ.get("SMTP_PASS", "")
-SMTP_FROM = os.environ.get("SMTP_FROM", "")   # defaults to SMTP_USER if blank
+# ── Resend email config ───────────────────────────────────────────────────────
+# Sign up free at resend.com → API Keys → create key → add to Render env vars.
+# RESEND_FROM: use "Name <you@yourdomain.com>" or leave blank to use resend.dev
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+RESEND_FROM    = os.environ.get("RESEND_FROM", os.environ.get("SMTP_FROM", ""))
 
 # ── Default event settings ────────────────────────────────────────────────────
 # These are used when no override exists in the database.
@@ -49,6 +45,7 @@ SETTING_DEFAULTS = {
     "event_subtitle":     "Reserve Your Place",
     "event_description":  "Complete the form, pay, and upload your receipt to confirm your booking.",
     "show_dates":         "2026-04-19,2026-04-26",   # comma-separated ISO dates
+    "show_times":         "4.00pm-6.30pm",
     "early_bird_price":   "25",
     "standard_price":     "30",
     "early_bird_limit":   "30",
@@ -91,7 +88,7 @@ def _generate_qr_png_bytes(ticket_id: str) -> bytes:
 
 
 def _format_date(iso_date: str) -> str:
-    """Convert '2026-04-19' → 'Sunday, 19 April 2026'."""
+    """Convert '2026-04-19' → 'Sunday, 19 April 2026, 4.00pm-6.30pm'."""
     try:
         d = date.fromisoformat(iso_date)
         return d.strftime("%A, %-d %B %Y")
@@ -99,18 +96,16 @@ def _format_date(iso_date: str) -> str:
         return iso_date
 
 
-def _build_email_html(ticket, settings: dict, has_qr: bool) -> str:
+def _build_email_html(ticket, settings: dict, qr_data_uri: str) -> str:
     """Build a beautiful HTML confirmation email."""
     event_name  = settings.get("event_name", "Theatre Event")
     show_date   = _format_date(ticket.show_date)
     qty_label   = f'{ticket.quantity} ticket{"s" if ticket.quantity > 1 else ""}'
 
-    # Use CID reference — email clients render this as an inline image.
-    # data: URIs are blocked by Gmail/Outlook for security reasons.
     qr_img_html = (
-        '<img src="cid:qrcode" alt="Entry QR Code" '
+        f'<img src="{qr_data_uri}" alt="Entry QR Code" '
         'width="200" height="200" style="display:block;margin:0 auto;" />'
-        if has_qr
+        if qr_data_uri
         else '<p style="text-align:center;color:#888;font-size:13px;">QR code unavailable</p>'
     )
 
@@ -247,45 +242,47 @@ def _build_email_html(ticket, settings: dict, has_qr: bool) -> str:
 
 def _send_ticket_email(ticket, settings: dict) -> None:
     """
-    Send a booking confirmation email with embedded QR code.
-    Non-blocking: any SMTP error is logged but NOT re-raised,
+    Send a booking confirmation email via Resend HTTP API.
+    Non-blocking: any error is logged but NOT re-raised,
     so registration always succeeds even if email fails.
     """
-    if not SMTP_USER or not SMTP_PASS:
+    if not RESEND_API_KEY:
         logger.info(
-            "Email not configured (SMTP_USER/SMTP_PASS not set) — "
+            "Email not configured (RESEND_API_KEY not set) — "
             "skipping confirmation email for %s.", ticket.ticket_id
         )
         return
 
     try:
-        qr_png     = _generate_qr_png_bytes(ticket.ticket_id)
-        html_body  = _build_email_html(ticket, settings, bool(qr_png))
+        qr_png      = _generate_qr_png_bytes(ticket.ticket_id)
+        qr_data_uri = (
+            "data:image/png;base64," + base64.b64encode(qr_png).decode()
+            if qr_png else ""
+        )
+        html_body  = _build_email_html(ticket, settings, qr_data_uri)
         event_name = settings.get("event_name", "Theatre Event")
+        from_addr  = RESEND_FROM or "Theatre Booking <onboarding@resend.dev>"
 
-        # multipart/related lets the HTML reference the inline QR image via cid:
-        msg = MIMEMultipart("related")
-        msg["Subject"] = f"🎭 Booking Confirmed — {event_name}"
-        msg["From"]    = SMTP_FROM or SMTP_USER
-        msg["To"]      = ticket.email
-        msg.attach(MIMEText(html_body, "html", "utf-8"))
+        payload = json.dumps({
+            "from":    from_addr,
+            "to":      [ticket.email],
+            "subject": f"🎭 Booking Confirmed — {event_name}",
+            "html":    html_body,
+        }).encode("utf-8")
 
-        # Attach QR code as inline image — Content-ID matches cid:qrcode in HTML
-        if qr_png:
-            qr_part = MIMEImage(qr_png, _subtype="png")
-            qr_part.add_header("Content-ID", "<qrcode>")
-            qr_part.add_header("Content-Disposition", "inline", filename="ticket-qr.png")
-            msg.attach(qr_part)
-
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
-            server.ehlo()
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASS)
-            server.sendmail(msg["From"], [ticket.email], msg.as_string())
-
+        req = urllib.request.Request(
+            "https://api.resend.com/emails",
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "Content-Type":  "application/json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            result = json.loads(resp.read())
         logger.info(
-            "Confirmation email sent → %s (ticket %s)",
-            ticket.email, ticket.ticket_id
+            "Confirmation email sent via Resend → %s (id: %s)",
+            ticket.email, result.get("id")
         )
 
     except Exception as exc:
