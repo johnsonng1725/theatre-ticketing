@@ -32,11 +32,13 @@ BACKSTAGE_KEY    = os.environ.get("BACKSTAGE_KEY",  "admin")
 _raw_origins     = os.environ.get("CORS_ORIGINS", "*")
 CORS_ORIGINS     = [o.strip() for o in _raw_origins.split(",")] if _raw_origins != "*" else ["*"]
 
-# ── Resend email config ───────────────────────────────────────────────────────
-# Sign up free at resend.com → API Keys → create key → add to Render env vars.
-# RESEND_FROM: use "Name <you@yourdomain.com>" or leave blank to use resend.dev
-RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
-RESEND_FROM    = os.environ.get("RESEND_FROM", os.environ.get("SMTP_FROM", ""))
+# ── Brevo email config ────────────────────────────────────────────────────────
+# Sign up free at brevo.com → SMTP & API → API Keys → create key.
+# BREVO_FROM_EMAIL: the sender email (your Gmail is fine, no domain needed)
+# BREVO_FROM_NAME:  display name shown in inbox (e.g. "MCKL Theatre")
+BREVO_API_KEY    = os.environ.get("BREVO_API_KEY",    "")
+BREVO_FROM_EMAIL = os.environ.get("BREVO_FROM_EMAIL", os.environ.get("SMTP_FROM", ""))
+BREVO_FROM_NAME  = os.environ.get("BREVO_FROM_NAME",  "Theatre Booking")
 
 # ── Default event settings ────────────────────────────────────────────────────
 # These are used when no override exists in the database.
@@ -242,13 +244,13 @@ def _build_email_html(ticket, settings: dict, qr_data_uri: str) -> str:
 
 def _send_ticket_email(ticket, settings: dict) -> None:
     """
-    Send a booking confirmation email via Resend HTTP API.
+    Send a booking confirmation email via Brevo HTTP API.
     Non-blocking: any error is logged but NOT re-raised,
     so registration always succeeds even if email fails.
     """
-    if not RESEND_API_KEY:
+    if not BREVO_API_KEY or not BREVO_FROM_EMAIL:
         logger.info(
-            "Email not configured (RESEND_API_KEY not set) — "
+            "Email not configured (BREVO_API_KEY/BREVO_FROM_EMAIL not set) — "
             "skipping confirmation email for %s.", ticket.ticket_id
         )
         return
@@ -261,28 +263,28 @@ def _send_ticket_email(ticket, settings: dict) -> None:
         )
         html_body  = _build_email_html(ticket, settings, qr_data_uri)
         event_name = settings.get("event_name", "Theatre Event")
-        from_addr  = RESEND_FROM or "Theatre Booking <onboarding@resend.dev>"
 
         payload = json.dumps({
-            "from":    from_addr,
-            "to":      [ticket.email],
-            "subject": f"🎭 Booking Confirmed — {event_name}",
-            "html":    html_body,
+            "sender":      {"name": BREVO_FROM_NAME, "email": BREVO_FROM_EMAIL},
+            "to":          [{"email": ticket.email, "name": ticket.name}],
+            "subject":     f"🎭 Booking Confirmed — {event_name}",
+            "htmlContent": html_body,
         }).encode("utf-8")
 
         req = urllib.request.Request(
-            "https://api.resend.com/emails",
+            "https://api.brevo.com/v3/smtp/email",
             data=payload,
             headers={
-                "Authorization": f"Bearer {RESEND_API_KEY}",
-                "Content-Type":  "application/json",
+                "api-key":      BREVO_API_KEY,
+                "Content-Type": "application/json",
+                "Accept":       "application/json",
             },
         )
         with urllib.request.urlopen(req, timeout=15) as resp:
             result = json.loads(resp.read())
         logger.info(
-            "Confirmation email sent via Resend → %s (id: %s)",
-            ticket.email, result.get("id")
+            "Confirmation email sent via Brevo → %s (messageId: %s)",
+            ticket.email, result.get("messageId")
         )
 
     except Exception as exc:
