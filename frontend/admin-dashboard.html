@@ -1336,7 +1336,7 @@
         }
         if (!res.ok) throw new Error('Server error');
         const data = await res.json();
-        if (data.role !== 'dashboard' && data.role !== 'finance') {
+        if (data.role !== 'dashboard' && data.role !== 'finance' && data.role !== 'scanner') {
           $('modal-error').textContent = 'This key does not have dashboard access.';
           $('modal-error').classList.add('visible');
           return;
@@ -1365,6 +1365,11 @@
         badge.className   = 'role-badge finance';
         badge.style.display = '';
         settings.style.display = 'none'; // finance cannot change settings
+      } else if (userRole === 'scanner') {
+        badge.textContent = 'Scanner';
+        badge.className   = 'role-badge finance'; // reuse blue style
+        badge.style.display = '';
+        settings.style.display = 'none'; // scanner cannot change settings
       } else if (userRole === 'dashboard') {
         badge.textContent = 'Admin';
         badge.className   = 'role-badge admin';
@@ -1464,7 +1469,7 @@
 
         const typeChip = `<span class="type-chip${typeClass}">${escape(t.ticket_type)}</span>`;
 
-        const actionBtns = userRole === 'finance'
+        const actionBtns = (userRole === 'finance' || userRole === 'scanner')
           ? `<span style="color:var(--text-muted);font-size:0.78rem">—</span>`
           : `<button class="btn-edit"   onclick="openEditModal('${escape(t.ticket_id)}')">Edit</button>
              <button class="btn-delete" onclick="openDeleteModal('${escape(t.ticket_id)}', '${escape(t.name)}')">Delete</button>`;

@@ -368,7 +368,7 @@ def admin_ping(
         return {"ok": True, "role": "finance"}
     if x_admin_key == SCANNER_KEY:
         _log_action(db, "Scanner", "login", "Logged in as Scanner (view only)")
-        return {"ok": True, "role": "finance"}   # scanner key gets read-only dashboard access
+        return {"ok": True, "role": "scanner"}
     if x_admin_key == BACKSTAGE_KEY:
         _log_action(db, "Admin", "login", "Logged in to Backstage")
         return {"ok": True, "role": "backstage"}
