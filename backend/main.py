@@ -98,16 +98,16 @@ def _format_date(iso_date: str) -> str:
         return iso_date
 
 
-def _build_email_html(ticket, settings: dict, qr_data_uri: str) -> str:
+def _build_email_html(ticket, settings: dict, has_qr: bool) -> str:
     """Build a beautiful HTML confirmation email."""
     event_name  = settings.get("event_name", "Theatre Event")
     show_date   = _format_date(ticket.show_date)
     qty_label   = f'{ticket.quantity} ticket{"s" if ticket.quantity > 1 else ""}'
 
     qr_img_html = (
-        f'<img src="{qr_data_uri}" alt="Entry QR Code" '
+        '<img src="cid:qrcode" alt="Entry QR Code" '
         'width="200" height="200" style="display:block;margin:0 auto;" />'
-        if qr_data_uri
+        if has_qr
         else '<p style="text-align:center;color:#888;font-size:13px;">QR code unavailable</p>'
     )
 
@@ -256,20 +256,26 @@ def _send_ticket_email(ticket, settings: dict) -> None:
         return
 
     try:
-        qr_png      = _generate_qr_png_bytes(ticket.ticket_id)
-        qr_data_uri = (
-            "data:image/png;base64," + base64.b64encode(qr_png).decode()
-            if qr_png else ""
-        )
-        html_body  = _build_email_html(ticket, settings, qr_data_uri)
+        qr_png     = _generate_qr_png_bytes(ticket.ticket_id)
+        html_body  = _build_email_html(ticket, settings, bool(qr_png))
         event_name = settings.get("event_name", "Theatre Event")
 
-        payload = json.dumps({
+        payload_dict = {
             "sender":      {"name": BREVO_FROM_NAME, "email": BREVO_FROM_EMAIL},
             "to":          [{"email": ticket.email, "name": ticket.name}],
             "subject":     f"🎭 Booking Confirmed — {event_name}",
             "htmlContent": html_body,
-        }).encode("utf-8")
+        }
+
+        # Attach QR as inline image — referenced via cid:qrcode in the HTML
+        if qr_png:
+            payload_dict["attachment"] = [{
+                "content":   base64.b64encode(qr_png).decode(),
+                "name":      "ticket-qr.png",
+                "contentId": "qrcode",
+            }]
+
+        payload = json.dumps(payload_dict).encode("utf-8")
 
         req = urllib.request.Request(
             "https://api.brevo.com/v3/smtp/email",
