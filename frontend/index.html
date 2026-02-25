@@ -1174,11 +1174,18 @@
         });
 
         // ── Show dates ────────────────────────────────────────────
-        const grid      = $('show-date-grid');
-        const showTimes = s.show_times ? s.show_times.trim() : '';
-        grid.innerHTML  = '';
-        const dates = (s.show_dates || '').split(',').map(d => d.trim()).filter(Boolean);
-        dates.forEach(iso => {
+        // Use show_dates_json for per-date times; fall back to legacy fields
+        let dateDefs = [];
+        try { dateDefs = JSON.parse(s.show_dates_json || '[]'); } catch {}
+        if (!dateDefs.length) {
+          const legacyTime  = s.show_times ? s.show_times.trim() : '';
+          const legacyDates = (s.show_dates || '').split(',').map(d => d.trim()).filter(Boolean);
+          dateDefs = legacyDates.map(date => ({ date, time: legacyTime }));
+        }
+        const grid = $('show-date-grid');
+        grid.innerHTML = '';
+        dateDefs.forEach(({ date: iso, time: showTime }) => {
+          if (!iso) return;
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'show-date-btn';
@@ -1187,7 +1194,7 @@
           btn.innerHTML = `
             <span class="sdb-left">
               <span class="sdb-date">${formatShowDateLabel(iso)}</span>
-              ${showTimes ? `<span class="sdb-time">${showTimes}</span>` : ''}
+              ${showTime ? `<span class="sdb-time">${showTime}</span>` : ''}
             </span>
             <span class="sdb-right">
               <span class="sdb-remaining"></span>
@@ -1199,6 +1206,11 @@
         // ── DuitNow info ──────────────────────────────────────────
         if (s.duitnow_name) $('duitnow-name').textContent = s.duitnow_name;
         if (s.duitnow_id)   $('duitnow-id').textContent   = s.duitnow_id;
+        // Use uploaded QR image if available, otherwise keep the static fallback
+        if (s.duitnow_qr) {
+          const qrImg = $('duitnow-qr-img');
+          if (qrImg) qrImg.src = s.duitnow_qr;
+        }
 
       } catch (err) {
         console.warn('Could not load settings, using defaults:', err);

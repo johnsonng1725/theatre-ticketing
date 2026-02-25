@@ -56,8 +56,10 @@ SETTING_DEFAULTS = {
     "standard_limit":     "",    # empty = unlimited
     "total_capacity":     "100",
     "ticket_types_json":  "",    # JSON array [{name,price,limit}] — overrides legacy type fields
+    "show_dates_json":    "",    # JSON array [{date,time}] — overrides show_dates + show_times
     "duitnow_name":       "YOUR NAME / ORGANISATION",
     "duitnow_id":         "01X-XXX XXXX",
+    "duitnow_qr":         "",    # base64 data URL for DuitNow QR image
 }
 
 
@@ -448,8 +450,17 @@ def _total_sold(db: Session, show_date: str) -> int:
 @app.get("/api/availability")
 def get_availability(db: Session = Depends(get_db)):
     """Public — returns Early Bird and total capacity info per show date."""
-    settings        = get_all_settings(db)
-    show_dates      = [d.strip() for d in settings["show_dates"].split(",") if d.strip()]
+    settings = get_all_settings(db)
+    # Prefer show_dates_json (per-date rows) over legacy comma-separated show_dates
+    _sdj = settings.get("show_dates_json", "")
+    if _sdj:
+        try:
+            _date_defs = json.loads(_sdj)
+            show_dates = [d["date"].strip() for d in _date_defs if d.get("date", "").strip()]
+        except Exception:
+            show_dates = [d.strip() for d in settings["show_dates"].split(",") if d.strip()]
+    else:
+        show_dates = [d.strip() for d in settings["show_dates"].split(",") if d.strip()]
     eb_limit        = int(settings["early_bird_limit"])
     total_capacity  = int(settings.get("total_capacity", "100"))
     result = {}

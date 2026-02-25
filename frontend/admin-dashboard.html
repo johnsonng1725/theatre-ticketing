@@ -650,6 +650,89 @@
     }
     .settings-saved-msg.visible { display: flex; }
 
+    /* ── Dynamic show-date rows ─────────────────────────────── */
+    .sdt-header {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 0.5rem;
+      margin-bottom: 0.3rem;
+    }
+    .sdt-header span {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      padding-left: 0.2rem;
+    }
+    .show-date-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 0.5rem;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+    .show-date-row input {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--text);
+      font-size: 0.9rem;
+      padding: 0.55rem 0.8rem;
+      outline: none;
+      width: 100%;
+    }
+    .show-date-row input:focus { border-color: var(--gold); }
+    .btn-add-show-date {
+      background: transparent;
+      border: 1px dashed var(--border);
+      color: var(--text-muted);
+      border-radius: 8px;
+      padding: 0.5rem 1rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 0.25rem;
+    }
+    .btn-add-show-date:hover { border-color: var(--gold); color: var(--gold); }
+
+    /* ── DuitNow QR upload ──────────────────────────────────── */
+    .duitnow-qr-upload-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.6rem;
+    }
+    #s-duitnow-qr-preview {
+      width: 150px; height: 150px;
+      object-fit: contain;
+      border-radius: 8px;
+      background: #fff;
+      padding: 6px;
+      border: 1px solid var(--border);
+    }
+    .btn-upload-qr {
+      display: inline-block;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 0.5rem 1rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .btn-upload-qr:hover { border-color: var(--gold); }
+    .btn-remove-qr {
+      background: transparent;
+      border: 1px solid rgba(239,68,68,0.3);
+      color: var(--error);
+      border-radius: 6px;
+      padding: 0.3rem 0.65rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .btn-remove-qr:hover { background: rgba(239,68,68,0.1); }
+
     /* ── Edit button ────────────────────────────────────────── */
     .btn-edit {
       background: rgba(212,175,55,0.12);
@@ -1171,21 +1254,15 @@
         </div>
       </div>
 
-      <!-- Show Dates -->
+      <!-- Show Dates & Time (per-date rows) -->
       <div class="settings-section">
         <p class="settings-section-title">Show Dates & Time</p>
-        <div class="settings-grid">
-          <div class="settings-field full">
-            <label for="s-show-dates">Show Dates</label>
-            <input id="s-show-dates" type="text" placeholder="e.g. 2026-04-19,2026-04-26" />
-            <span class="field-hint">Comma-separated dates in YYYY-MM-DD format. E.g. 2026-04-19,2026-04-26</span>
-          </div>
-          <div class="settings-field full">
-            <label for="s-show-times">Show Time</label>
-            <input id="s-show-times" type="text" placeholder="e.g. 4.00pm - 6.30pm" />
-            <span class="field-hint">Displayed alongside each show date on the booking form</span>
-          </div>
+        <div class="sdt-header">
+          <span>Date (YYYY-MM-DD)</span><span>Show Time</span><span></span>
         </div>
+        <div id="s-show-dates-list"></div>
+        <button type="button" class="btn-add-show-date" onclick="addShowDateRow()">+ Add Show Date</button>
+        <span class="field-hint" style="margin-top:0.5rem;display:block">Each date can have its own show time. Time is displayed on the booking form.</span>
       </div>
 
       <!-- Ticket Types -->
@@ -1203,13 +1280,25 @@
       <div class="settings-section">
         <p class="settings-section-title">DuitNow Payment Details</p>
         <div class="settings-grid">
-          <div class="settings-field full">
+          <div class="settings-field">
             <label for="s-duitnow-name">Account Name</label>
             <input id="s-duitnow-name" type="text" placeholder="e.g. Jane Doe / XYZ Theatre Co." />
           </div>
-          <div class="settings-field full">
+          <div class="settings-field">
             <label for="s-duitnow-id">DuitNow ID (phone / IC / business reg)</label>
             <input id="s-duitnow-id" type="text" placeholder="e.g. 012-345 6789" />
+          </div>
+          <div class="settings-field full">
+            <label>DuitNow QR Code Image</label>
+            <div class="duitnow-qr-upload-wrap">
+              <img id="s-duitnow-qr-preview" class="hidden" alt="QR Preview" />
+              <label class="btn-upload-qr" for="s-duitnow-qr-file">📷 Upload QR Image</label>
+              <input id="s-duitnow-qr-file" type="file" accept="image/*" style="display:none"
+                     onchange="handleQrUpload(this)" />
+              <button type="button" class="btn-remove-qr hidden" id="btn-remove-qr"
+                      onclick="removeQrImage()">Remove QR</button>
+              <span class="field-hint">Upload your DuitNow QR code image (PNG/JPG). Shown on the booking form for attendees to scan.</span>
+            </div>
           </div>
         </div>
       </div>
@@ -1607,10 +1696,37 @@
       $('s-event-name').value     = s.event_name        || '';
       $('s-event-subtitle').value = s.event_subtitle    || '';
       $('s-event-desc').value     = s.event_description || '';
-      $('s-show-dates').value     = s.show_dates        || '';
-      $('s-show-times').value     = s.show_times        || '';
       $('s-duitnow-name').value   = s.duitnow_name      || '';
       $('s-duitnow-id').value     = s.duitnow_id        || '';
+
+      // Populate per-date show date rows
+      const dateList = $('s-show-dates-list');
+      dateList.innerHTML = '';
+      let dateDefs = [];
+      try { dateDefs = JSON.parse(s.show_dates_json || '[]'); } catch {}
+      if (!dateDefs.length) {
+        // Seed from legacy fields on first open
+        const legacyTime = s.show_times || '';
+        const legacyDates = (s.show_dates || '').split(',').map(d => d.trim()).filter(Boolean);
+        dateDefs = legacyDates.map(date => ({ date, time: legacyTime }));
+      }
+      if (!dateDefs.length) dateDefs = [{ date: '', time: '' }]; // at least one blank row
+      dateDefs.forEach(d => addShowDateRow(d));
+
+      // DuitNow QR preview
+      window._currentQrDataUrl = s.duitnow_qr || '';
+      window._pendingQrDataUrl  = null;
+      const qrPreview   = $('s-duitnow-qr-preview');
+      const btnRemoveQr = $('btn-remove-qr');
+      if (s.duitnow_qr) {
+        qrPreview.src = s.duitnow_qr;
+        qrPreview.classList.remove('hidden');
+        btnRemoveQr.classList.remove('hidden');
+      } else {
+        qrPreview.src = '';
+        qrPreview.classList.add('hidden');
+        btnRemoveQr.classList.add('hidden');
+      }
 
       // Populate dynamic ticket type rows
       const list = $('s-ticket-types-list');
@@ -1632,6 +1748,44 @@
       $('settings-modal').classList.remove('hidden');
     }
 
+    function addShowDateRow(d = {}) {
+      const row = document.createElement('div');
+      row.className = 'show-date-row';
+      row.innerHTML = `
+        <input type="text" class="sdr-date" placeholder="YYYY-MM-DD"
+               value="${(d.date || '').replace(/"/g,'&quot;')}" />
+        <input type="text" class="sdr-time" placeholder="e.g. 4.00pm – 6.30pm"
+               value="${(d.time || '').replace(/"/g,'&quot;')}" />
+        <button type="button" class="btn-remove-ttr"
+          onclick="this.closest('.show-date-row').remove()" title="Remove">✕</button>`;
+      $('s-show-dates-list').appendChild(row);
+    }
+
+    function handleQrUpload(input) {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const dataUrl = e.target.result;
+        window._pendingQrDataUrl = dataUrl;
+        const preview = $('s-duitnow-qr-preview');
+        preview.src = dataUrl;
+        preview.classList.remove('hidden');
+        $('btn-remove-qr').classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removeQrImage() {
+      window._pendingQrDataUrl  = '';
+      window._currentQrDataUrl  = '';
+      const preview = $('s-duitnow-qr-preview');
+      preview.src = '';
+      preview.classList.add('hidden');
+      $('btn-remove-qr').classList.add('hidden');
+      $('s-duitnow-qr-file').value = '';
+    }
+
     function addTicketTypeRow(t = {}) {
       const row = document.createElement('div');
       row.className = 'ticket-type-row';
@@ -1649,9 +1803,16 @@
     }
 
     async function saveSettings() {
-      const dates = $('s-show-dates').value.trim();
-      if (!dates) {
-        $('settings-modal-error').textContent = 'Show dates are required.';
+      // Collect per-date show date rows
+      const showDates = [...document.querySelectorAll('.show-date-row')]
+        .map(r => ({
+          date: r.querySelector('.sdr-date').value.trim(),
+          time: r.querySelector('.sdr-time').value.trim(),
+        }))
+        .filter(d => d.date);
+
+      if (!showDates.length) {
+        $('settings-modal-error').textContent = 'At least one show date is required.';
         $('settings-modal-error').classList.add('visible');
         return;
       }
@@ -1671,15 +1832,22 @@
         return;
       }
 
+      // Determine QR image value (pending upload > existing > cleared)
+      const qrValue = (window._pendingQrDataUrl !== null && window._pendingQrDataUrl !== undefined)
+        ? window._pendingQrDataUrl
+        : (window._currentQrDataUrl || '');
+
       const payload = {
         event_name:        $('s-event-name').value.trim(),
         event_subtitle:    $('s-event-subtitle').value.trim(),
         event_description: $('s-event-desc').value.trim(),
-        show_dates:        dates,
-        show_times:        $('s-show-times').value.trim(),
+        show_dates_json:   JSON.stringify(showDates),
+        show_dates:        showDates.map(d => d.date).join(','),  // backward compat
+        show_times:        showDates.map(d => d.time).filter(Boolean).join(' / '), // backward compat
         ticket_types_json: JSON.stringify(ticketTypes),
         duitnow_name:      $('s-duitnow-name').value.trim(),
         duitnow_id:        $('s-duitnow-id').value.trim(),
+        duitnow_qr:        qrValue,
       };
 
       $('btn-save-settings').disabled = true;
