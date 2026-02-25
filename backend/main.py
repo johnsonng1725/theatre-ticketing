@@ -32,6 +32,8 @@ BACKSTAGE_KEY    = os.environ.get("BACKSTAGE_KEY",  "admin")
 _raw_origins     = os.environ.get("CORS_ORIGINS", "*")
 CORS_ORIGINS     = [o.strip() for o in _raw_origins.split(",")] if _raw_origins != "*" else ["*"]
 
+BACKEND_URL      = os.environ.get("BACKEND_URL",    "")   # e.g. https://theatre-ticketing-api.onrender.com
+
 # ── Brevo email config ────────────────────────────────────────────────────────
 # Sign up free at brevo.com → SMTP & API → API Keys → create key.
 # BREVO_FROM_EMAIL: the sender email (your Gmail is fine, no domain needed)
@@ -98,16 +100,16 @@ def _format_date(iso_date: str) -> str:
         return iso_date
 
 
-def _build_email_html(ticket, settings: dict, has_qr: bool) -> str:
+def _build_email_html(ticket, settings: dict, qr_url: str) -> str:
     """Build a beautiful HTML confirmation email."""
     event_name  = settings.get("event_name", "Theatre Event")
     show_date   = _format_date(ticket.show_date)
     qty_label   = f'{ticket.quantity} ticket{"s" if ticket.quantity > 1 else ""}'
 
     qr_img_html = (
-        '<img src="cid:qrcode" alt="Entry QR Code" '
+        f'<img src="{qr_url}" alt="Entry QR Code" '
         'width="200" height="200" style="display:block;margin:0 auto;" />'
-        if has_qr
+        if qr_url
         else '<p style="text-align:center;color:#888;font-size:13px;">QR code unavailable</p>'
     )
 
@@ -256,26 +258,18 @@ def _send_ticket_email(ticket, settings: dict) -> None:
         return
 
     try:
-        qr_png     = _generate_qr_png_bytes(ticket.ticket_id)
-        html_body  = _build_email_html(ticket, settings, bool(qr_png))
+        # Build a public HTTPS URL for the QR image — email clients fetch it directly.
+        # This avoids CID inline attachments which Brevo's REST API doesn't support.
+        qr_url     = f"{BACKEND_URL}/api/ticket/{ticket.ticket_id}/qr" if BACKEND_URL else ""
+        html_body  = _build_email_html(ticket, settings, qr_url)
         event_name = settings.get("event_name", "Theatre Event")
 
-        payload_dict = {
+        payload = json.dumps({
             "sender":      {"name": BREVO_FROM_NAME, "email": BREVO_FROM_EMAIL},
             "to":          [{"email": ticket.email, "name": ticket.name}],
             "subject":     f"🎭 Booking Confirmed — {event_name}",
             "htmlContent": html_body,
-        }
-
-        # Attach QR as inline image — referenced via cid:qrcode in the HTML
-        if qr_png:
-            payload_dict["attachment"] = [{
-                "content":   base64.b64encode(qr_png).decode(),
-                "name":      "ticket-qr.png",
-                "contentId": "qrcode",
-            }]
-
-        payload = json.dumps(payload_dict).encode("utf-8")
+        }).encode("utf-8")
 
         req = urllib.request.Request(
             "https://api.brevo.com/v3/smtp/email",
@@ -357,6 +351,16 @@ def verify_scanner(x_admin_key: str = Header(..., alias="X-Admin-Key")):
 @app.get("/api/health")
 def health_check():
     return {"status": "ok"}
+
+
+@app.get("/api/ticket/{ticket_id}/qr")
+def get_ticket_qr(ticket_id: str):
+    """Public endpoint — generates and serves the QR code PNG for a ticket.
+    Used by confirmation emails so the image is fetched via HTTPS (no CID needed)."""
+    png = _generate_qr_png_bytes(ticket_id)
+    if not png:
+        raise HTTPException(status_code=404, detail="QR generation failed")
+    return Response(content=png, media_type="image/png")
 
 
 @app.get("/api/admin/ping")
