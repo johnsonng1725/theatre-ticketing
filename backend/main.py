@@ -53,7 +53,9 @@ SETTING_DEFAULTS = {
     "early_bird_price":   "25",
     "standard_price":     "30",
     "early_bird_limit":   "30",
+    "standard_limit":     "",    # empty = unlimited
     "total_capacity":     "100",
+    "ticket_types_json":  "",    # JSON array [{name,price,limit}] — overrides legacy type fields
     "duitnow_name":       "YOUR NAME / ORGANISATION",
     "duitnow_id":         "01X-XXX XXXX",
 }
@@ -417,11 +419,16 @@ def update_settings(payload: dict, db: Session = Depends(get_db)):
 
 def _early_bird_sold(db: Session, show_date: str) -> int:
     """Return total Early Bird tickets sold (sum of quantities) for a show date."""
+    return _type_sold(db, "Early Bird", show_date)
+
+
+def _type_sold(db: Session, ticket_type: str, show_date: str) -> int:
+    """Return tickets sold (sum of quantities) for any ticket type + show date."""
     result = (
         db.query(func.sum(models.Ticket.quantity))
         .filter(
-            models.Ticket.show_date == show_date,
-            models.Ticket.ticket_type == "Early Bird",
+            models.Ticket.show_date   == show_date,
+            models.Ticket.ticket_type == ticket_type,
         )
         .scalar()
     )
@@ -483,19 +490,53 @@ def register_ticket(
             ),
         )
 
-    # Enforce Early Bird capacity (uses quantity sum, not row count)
-    if ticket.ticket_type == "Early Bird":
-        eb_limit  = int(settings["early_bird_limit"])
-        eb_sold   = _early_bird_sold(db, ticket.show_date)
-        eb_remaining = max(0, eb_limit - eb_sold)
-        if ticket.quantity > eb_remaining:
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    f"Only {eb_remaining} Early Bird ticket(s) remaining for this date. "
-                    f"Please reduce your quantity or choose Standard."
-                ),
-            )
+    # Enforce per-type capacity limits
+    types_json = settings.get("ticket_types_json", "")
+    if types_json:
+        # Dynamic ticket types — check limit from ticket_types_json
+        try:
+            type_defs = json.loads(types_json)
+            tdef = next((t for t in type_defs if t["name"] == ticket.ticket_type), None)
+            if tdef and tdef.get("limit"):
+                t_limit     = int(tdef["limit"])
+                t_sold      = _type_sold(db, ticket.ticket_type, ticket.show_date)
+                t_remaining = max(0, t_limit - t_sold)
+                if ticket.quantity > t_remaining:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            f"Only {t_remaining} {ticket.ticket_type} ticket(s) remaining for this date."
+                        ),
+                    )
+        except (ValueError, KeyError):
+            pass  # malformed JSON — skip limit check
+    else:
+        # Legacy mode — Early Bird limit only
+        if ticket.ticket_type == "Early Bird":
+            eb_limit     = int(settings.get("early_bird_limit", "30") or "30")
+            eb_sold      = _early_bird_sold(db, ticket.show_date)
+            eb_remaining = max(0, eb_limit - eb_sold)
+            if ticket.quantity > eb_remaining:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"Only {eb_remaining} Early Bird ticket(s) remaining for this date. "
+                        f"Please reduce your quantity or choose Standard."
+                    ),
+                )
+        # Standard limit (if set)
+        std_limit_str = settings.get("standard_limit", "")
+        if std_limit_str and ticket.ticket_type == "Standard":
+            std_limit     = int(std_limit_str)
+            std_sold      = _type_sold(db, "Standard", ticket.show_date)
+            std_remaining = max(0, std_limit - std_sold)
+            if ticket.quantity > std_remaining:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"Only {std_remaining} Standard ticket(s) remaining for this date."
+                    ),
+                )
 
     ticket_id = secrets.token_urlsafe(16)
     db_ticket = models.Ticket(

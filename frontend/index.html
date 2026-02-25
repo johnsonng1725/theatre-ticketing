@@ -500,20 +500,8 @@
 
         <div class="field">
           <label>Ticket Type</label>
-          <div class="ticket-type-grid">
-            <button type="button" class="ticket-type-btn" id="btn-early-bird"
-                    onclick="selectTicketType('Early Bird')">
-              <span class="ttb-name">Early Bird</span>
-              <span class="ttb-price" id="ttb-eb-price">RM25</span>
-              <span class="ttb-remaining" id="ttb-eb-remaining"></span>
-              <span class="ttb-soldout-badge">Sold Out</span>
-            </button>
-            <button type="button" class="ticket-type-btn" id="btn-standard"
-                    onclick="selectTicketType('Standard')">
-              <span class="ttb-name">Standard</span>
-              <span class="ttb-price" id="ttb-std-price">RM30</span>
-              <span class="ttb-remaining" id="ttb-std-remaining"></span>
-            </button>
+          <div class="ticket-type-grid" id="ticket-type-grid">
+            <!-- Populated dynamically from /api/settings (ticket_types_json) -->
           </div>
           <input type="hidden" id="ticket_type" value="" />
           <span class="sold-out-hint" id="early-bird-hint"></span>
@@ -743,15 +731,16 @@
 
     // ── Ticket type button selection ─────────────────────────────────
     function selectTicketType(value) {
-      // Block clicking a sold-out Early Bird card
-      if (value === 'Early Bird' && $('btn-early-bird').classList.contains('sold-out')) return;
+      // Block clicking a sold-out button
+      const targetBtn = document.querySelector(`.ticket-type-btn[data-type="${CSS.escape(value)}"]`);
+      if (targetBtn && targetBtn.classList.contains('sold-out')) return;
 
       $('ticket_type').value = value;
 
       // Highlight selected card
-      document.querySelectorAll('.ticket-type-btn').forEach(b => b.classList.remove('selected'));
-      const btnId = value === 'Early Bird' ? 'btn-early-bird' : 'btn-standard';
-      $(btnId).classList.add('selected');
+      document.querySelectorAll('.ticket-type-btn').forEach(b =>
+        b.classList.toggle('selected', b.dataset.type === value)
+      );
 
       updateQtyMax();
       updateOrderSummary();
@@ -760,41 +749,52 @@
     }
 
     function updateEarlyBirdOption(showDate) {
-      const btn       = $('btn-early-bird');
-      const remaining = $('ttb-eb-remaining');
-      const stdRem    = $('ttb-std-remaining');
-      const hint      = $('early-bird-hint');
+      // Update all ticket type buttons based on availability
+      const hint = $('early-bird-hint');
+      const avail = showDate && availability[showDate];
 
-      if (!showDate || !availability[showDate]) {
-        btn.classList.remove('sold-out');
-        remaining.textContent = '';
-        stdRem.textContent    = '';
-        hint.classList.remove('visible');
-        updateQtyMax();
-        updateOrderSummary();
-        updateSubmitButton();
-        return;
-      }
+      document.querySelectorAll('.ticket-type-btn').forEach(btn => {
+        const type    = btn.dataset.type;
+        const remSpan = btn.querySelector('.ttb-remaining');
 
-      const { early_bird_remaining, early_bird_sold_out, total_remaining } = availability[showDate];
-
-      if (early_bird_sold_out) {
-        btn.classList.add('sold-out');
-        remaining.textContent = '';
-        hint.textContent = 'Early Bird tickets are sold out for this date.';
-        hint.classList.add('visible');
-        // Deselect Early Bird if it was active
-        if ($('ticket_type').value === 'Early Bird') {
-          $('ticket_type').value = '';
-          btn.classList.remove('selected');
+        if (!avail) {
+          btn.classList.remove('sold-out');
+          if (remSpan) remSpan.textContent = '';
+          return;
         }
-      } else {
-        btn.classList.remove('sold-out');
-        remaining.textContent = `${early_bird_remaining} left`;
-        hint.classList.remove('visible');
-      }
 
-      stdRem.textContent = `${total_remaining} left`;
+        if (type === 'Early Bird') {
+          const { early_bird_remaining, early_bird_sold_out } = avail;
+          if (early_bird_sold_out) {
+            btn.classList.add('sold-out');
+            if (remSpan) remSpan.textContent = '';
+            hint.textContent = 'Early Bird tickets are sold out for this date.';
+            hint.classList.add('visible');
+            if ($('ticket_type').value === 'Early Bird') {
+              $('ticket_type').value = '';
+              btn.classList.remove('selected');
+            }
+          } else {
+            btn.classList.remove('sold-out');
+            if (remSpan) remSpan.textContent = `${early_bird_remaining} left`;
+            hint.classList.remove('visible');
+          }
+        } else {
+          // Other types: show total remaining
+          if (remSpan) remSpan.textContent = avail.total_remaining > 0 ? `${avail.total_remaining} left` : '';
+          if (avail.total_sold_out) {
+            btn.classList.add('sold-out');
+            if ($('ticket_type').value === type) {
+              $('ticket_type').value = '';
+              btn.classList.remove('selected');
+            }
+          } else {
+            btn.classList.remove('sold-out');
+          }
+        }
+      });
+
+      if (!avail) hint.classList.remove('visible');
 
       updateQtyMax();
       updateOrderSummary();
@@ -1141,13 +1141,37 @@
         if (s.event_description) $('hdr-desc').textContent    = s.event_description;
 
         // ── Prices ────────────────────────────────────────────────
-        const ebPrice  = parseInt(s.early_bird_price || '25', 10);
-        const stdPrice = parseInt(s.standard_price   || '30', 10);
-        PRICES = { 'Early Bird': ebPrice, 'Standard': stdPrice };
+        // ── Ticket types (dynamic) ────────────────────────────────
+        let ticketTypes = [];
+        try { ticketTypes = JSON.parse(s.ticket_types_json || '[]'); } catch {}
+        if (!ticketTypes.length) {
+          // Fall back to legacy fields
+          ticketTypes = [
+            { name: 'Early Bird', price: s.early_bird_price || '25', limit: s.early_bird_limit || '' },
+            { name: 'Standard',   price: s.standard_price   || '30', limit: s.standard_limit   || '' },
+          ];
+        }
 
-        // Update button price labels
-        $('ttb-eb-price').textContent  = `RM${ebPrice}`;
-        $('ttb-std-price').textContent = `RM${stdPrice}`;
+        // Rebuild PRICES map
+        PRICES = {};
+        ticketTypes.forEach(t => { PRICES[t.name] = parseInt(t.price, 10) || 0; });
+
+        // Rebuild ticket type buttons
+        const typeGrid = $('ticket-type-grid');
+        typeGrid.innerHTML = '';
+        ticketTypes.forEach(t => {
+          const btn = document.createElement('button');
+          btn.type      = 'button';
+          btn.className = 'ticket-type-btn';
+          btn.dataset.type = t.name;
+          btn.addEventListener('click', () => selectTicketType(t.name));
+          btn.innerHTML = `
+            <span class="ttb-name">${t.name}</span>
+            <span class="ttb-price">RM${t.price}</span>
+            <span class="ttb-remaining"></span>
+            <span class="ttb-soldout-badge">Sold Out</span>`;
+          typeGrid.appendChild(btn);
+        });
 
         // ── Show dates ────────────────────────────────────────────
         const grid      = $('show-date-grid');

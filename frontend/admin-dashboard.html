@@ -592,6 +592,62 @@
       color: var(--success); font-size: 0.82rem; margin-right: auto;
       display: none; align-items: center; gap: 0.3rem;
     }
+
+    /* ── Dynamic ticket type rows ──────────────────────────────── */
+    .ticket-type-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr auto;
+      gap: 0.5rem;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+    .ticket-type-row input {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--text);
+      font-size: 0.9rem;
+      padding: 0.55rem 0.8rem;
+      outline: none;
+      width: 100%;
+    }
+    .ticket-type-row input:focus { border-color: var(--gold); }
+    .btn-add-ticket-type {
+      background: transparent;
+      border: 1px dashed var(--border);
+      color: var(--text-muted);
+      border-radius: 8px;
+      padding: 0.5rem 1rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 0.25rem;
+    }
+    .btn-add-ticket-type:hover { border-color: var(--gold); color: var(--gold); }
+    .btn-remove-ttr {
+      background: transparent;
+      border: 1px solid rgba(239,68,68,0.3);
+      color: var(--error);
+      border-radius: 6px;
+      padding: 0.35rem 0.55rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-remove-ttr:hover { background: rgba(239,68,68,0.12); }
+    .ttr-header {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr auto;
+      gap: 0.5rem;
+      margin-bottom: 0.3rem;
+    }
+    .ttr-header span {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      padding-left: 0.2rem;
+    }
     .settings-saved-msg.visible { display: flex; }
 
     /* ── Edit button ────────────────────────────────────────── */
@@ -1117,33 +1173,30 @@
 
       <!-- Show Dates -->
       <div class="settings-section">
-        <p class="settings-section-title">Show Dates</p>
+        <p class="settings-section-title">Show Dates & Time</p>
         <div class="settings-grid">
           <div class="settings-field full">
             <label for="s-show-dates">Show Dates</label>
             <input id="s-show-dates" type="text" placeholder="e.g. 2026-04-19,2026-04-26" />
             <span class="field-hint">Comma-separated dates in YYYY-MM-DD format. E.g. 2026-04-19,2026-04-26</span>
           </div>
+          <div class="settings-field full">
+            <label for="s-show-times">Show Time</label>
+            <input id="s-show-times" type="text" placeholder="e.g. 4.00pm - 6.30pm" />
+            <span class="field-hint">Displayed alongside each show date on the booking form</span>
+          </div>
         </div>
       </div>
 
-      <!-- Ticket Pricing -->
+      <!-- Ticket Types -->
       <div class="settings-section">
-        <p class="settings-section-title">Ticket Pricing & Limits</p>
-        <div class="settings-grid">
-          <div class="settings-field">
-            <label for="s-eb-price">Early Bird Price (RM)</label>
-            <input id="s-eb-price" type="number" min="0" placeholder="e.g. 25" />
-          </div>
-          <div class="settings-field">
-            <label for="s-std-price">Standard Price (RM)</label>
-            <input id="s-std-price" type="number" min="0" placeholder="e.g. 30" />
-          </div>
-          <div class="settings-field">
-            <label for="s-eb-limit">Early Bird Limit (per show date)</label>
-            <input id="s-eb-limit" type="number" min="1" placeholder="e.g. 30" />
-          </div>
+        <p class="settings-section-title">Ticket Types</p>
+        <div class="ttr-header">
+          <span>Type Name</span><span>Price (RM)</span><span>Limit / Date</span><span></span>
         </div>
+        <div id="s-ticket-types-list"></div>
+        <button type="button" class="btn-add-ticket-type" onclick="addTicketTypeRow()">+ Add Ticket Type</button>
+        <span class="field-hint" style="margin-top:0.5rem;display:block">Limit is per show date — leave blank for unlimited.</span>
       </div>
 
       <!-- DuitNow -->
@@ -1545,27 +1598,50 @@
     // ── Settings modal ───────────────────────────────────────
     async function openSettingsModal() {
       if (userRole !== 'dashboard') return; // finance role: no settings access
-      // Load current settings from API
+      let s = {};
       try {
         const res = await fetch(`${API_BASE}/api/settings`);
-        const s   = res.ok ? await res.json() : {};
+        s = res.ok ? await res.json() : {};
+      } catch {}
 
-        $('s-event-name').value     = s.event_name        || '';
-        $('s-event-subtitle').value = s.event_subtitle    || '';
-        $('s-event-desc').value     = s.event_description || '';
-        $('s-show-dates').value     = s.show_dates        || '';
-        $('s-eb-price').value       = s.early_bird_price  || '';
-        $('s-std-price').value      = s.standard_price    || '';
-        $('s-eb-limit').value       = s.early_bird_limit  || '';
-        $('s-duitnow-name').value   = s.duitnow_name      || '';
-        $('s-duitnow-id').value     = s.duitnow_id        || '';
-      } catch {
-        // Leave fields blank — user can still fill them in
+      $('s-event-name').value     = s.event_name        || '';
+      $('s-event-subtitle').value = s.event_subtitle    || '';
+      $('s-event-desc').value     = s.event_description || '';
+      $('s-show-dates').value     = s.show_dates        || '';
+      $('s-show-times').value     = s.show_times        || '';
+      $('s-duitnow-name').value   = s.duitnow_name      || '';
+      $('s-duitnow-id').value     = s.duitnow_id        || '';
+
+      // Populate dynamic ticket type rows
+      const list = $('s-ticket-types-list');
+      list.innerHTML = '';
+      let types = [];
+      try { types = JSON.parse(s.ticket_types_json || '[]'); } catch {}
+      if (!types.length) {
+        // Seed from legacy fields on first open
+        types = [
+          { name: 'Early Bird', price: s.early_bird_price || '25', limit: s.early_bird_limit || '30' },
+          { name: 'Standard',   price: s.standard_price   || '30', limit: s.standard_limit   || ''   },
+        ];
       }
+      types.forEach(t => addTicketTypeRow(t));
+
       $('settings-modal-error').classList.remove('visible');
       $('settings-saved-msg').classList.remove('visible');
       $('btn-save-settings').disabled = false;
       $('settings-modal').classList.remove('hidden');
+    }
+
+    function addTicketTypeRow(t = {}) {
+      const row = document.createElement('div');
+      row.className = 'ticket-type-row';
+      row.innerHTML = `
+        <input type="text"   class="ttr-name"  placeholder="e.g. Early Bird" value="${(t.name  || '').replace(/"/g,'&quot;')}" />
+        <input type="number" class="ttr-price" placeholder="RM" min="0"      value="${t.price || ''}" />
+        <input type="number" class="ttr-limit" placeholder="∞"  min="1"      value="${t.limit || ''}" />
+        <button type="button" class="btn-remove-ttr"
+          onclick="this.closest('.ticket-type-row').remove()" title="Remove">✕</button>`;
+      $('s-ticket-types-list').appendChild(row);
     }
 
     function closeSettingsModal() {
@@ -1580,16 +1656,30 @@
         return;
       }
 
+      // Collect dynamic ticket type rows
+      const ticketTypes = [...document.querySelectorAll('.ticket-type-row')]
+        .map(r => ({
+          name:  r.querySelector('.ttr-name').value.trim(),
+          price: r.querySelector('.ttr-price').value.trim(),
+          limit: r.querySelector('.ttr-limit').value.trim(),
+        }))
+        .filter(t => t.name && t.price);
+
+      if (!ticketTypes.length) {
+        $('settings-modal-error').textContent = 'At least one ticket type with a name and price is required.';
+        $('settings-modal-error').classList.add('visible');
+        return;
+      }
+
       const payload = {
-        event_name:         $('s-event-name').value.trim(),
-        event_subtitle:     $('s-event-subtitle').value.trim(),
-        event_description:  $('s-event-desc').value.trim(),
-        show_dates:         dates,
-        early_bird_price:   $('s-eb-price').value.trim(),
-        standard_price:     $('s-std-price').value.trim(),
-        early_bird_limit:   $('s-eb-limit').value.trim(),
-        duitnow_name:       $('s-duitnow-name').value.trim(),
-        duitnow_id:         $('s-duitnow-id').value.trim(),
+        event_name:        $('s-event-name').value.trim(),
+        event_subtitle:    $('s-event-subtitle').value.trim(),
+        event_description: $('s-event-desc').value.trim(),
+        show_dates:        dates,
+        show_times:        $('s-show-times').value.trim(),
+        ticket_types_json: JSON.stringify(ticketTypes),
+        duitnow_name:      $('s-duitnow-name').value.trim(),
+        duitnow_id:        $('s-duitnow-id').value.trim(),
       };
 
       $('btn-save-settings').disabled = true;
