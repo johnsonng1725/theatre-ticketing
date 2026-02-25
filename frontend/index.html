@@ -191,6 +191,8 @@
       cursor: not-allowed;
       background: rgba(255,255,255,0.02);
     }
+    .sdb-left  { display: flex; flex-direction: column; gap: 0.15rem; }
+    .sdb-time  { font-size: 0.75rem; color: var(--text-muted); font-weight: 400; }
     .sdb-date {
       font-size: 0.9rem;
       font-weight: 600;
@@ -394,8 +396,9 @@
     .alert.visible { display: block; }
 
     /* ── Ticket result ───────────────────────────────────────────────── */
-    #ticket-result { display: none; margin-top: 2rem; text-align: center; }
+    #ticket-result { display: none; text-align: center; }
     #ticket-result.visible { display: block; }
+    #registration-form.hidden { display: none; }
 
     .ticket-card {
       background: var(--card); border: 1px solid var(--gold);
@@ -488,6 +491,14 @@
         </div>
 
         <div class="field">
+          <label>Show Date</label>
+          <div class="show-date-grid" id="show-date-grid">
+            <!-- Populated dynamically from /api/settings -->
+          </div>
+          <input type="hidden" id="show_date" value="" />
+        </div>
+
+        <div class="field">
           <label>Ticket Type</label>
           <div class="ticket-type-grid">
             <button type="button" class="ticket-type-btn" id="btn-early-bird"
@@ -506,14 +517,6 @@
           </div>
           <input type="hidden" id="ticket_type" value="" />
           <span class="sold-out-hint" id="early-bird-hint"></span>
-        </div>
-
-        <div class="field">
-          <label>Show Date</label>
-          <div class="show-date-grid" id="show-date-grid">
-            <!-- Populated dynamically from /api/settings -->
-          </div>
-          <input type="hidden" id="show_date" value="" />
         </div>
 
         <!-- Quantity stepper -->
@@ -1105,9 +1108,10 @@
         correctLevel: QRCode.CorrectLevel.H
       });
 
+      $('registration-form').classList.add('hidden');
       const result = $('ticket-result');
       result.classList.add('visible');
-      setTimeout(() => result.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function formatDate(iso) {
@@ -1146,8 +1150,9 @@
         $('ttb-std-price').textContent = `RM${stdPrice}`;
 
         // ── Show dates ────────────────────────────────────────────
-        const grid  = $('show-date-grid');
-        grid.innerHTML = '';
+        const grid      = $('show-date-grid');
+        const showTimes = s.show_times ? s.show_times.trim() : '';
+        grid.innerHTML  = '';
         const dates = (s.show_dates || '').split(',').map(d => d.trim()).filter(Boolean);
         dates.forEach(iso => {
           const btn = document.createElement('button');
@@ -1156,7 +1161,10 @@
           btn.dataset.iso = iso;
           btn.addEventListener('click', () => selectShowDate(iso));
           btn.innerHTML = `
-            <span class="sdb-date">${formatShowDateLabel(iso)}</span>
+            <span class="sdb-left">
+              <span class="sdb-date">${formatShowDateLabel(iso)}</span>
+              ${showTimes ? `<span class="sdb-time">${showTimes}</span>` : ''}
+            </span>
             <span class="sdb-right">
               <span class="sdb-remaining"></span>
               <span class="sdb-soldout-badge">Sold Out</span>
