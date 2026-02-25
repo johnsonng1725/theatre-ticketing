@@ -1231,16 +1231,16 @@
   <div id="settings-modal" class="hidden">
     <div class="settings-modal-box">
       <div class="settings-modal-head">
-        <h3>⚙️  Settings</h3>
+        <h3>⚙️ Event Settings</h3>
         <button onclick="closeSettingsModal()" title="Close">✕</button>
       </div>
 
-      <!--  Info -->
+      <!-- Event Info -->
       <div class="settings-section">
-        <p class="settings-section-title"> Info</p>
+        <p class="settings-section-title">Event Info</p>
         <div class="settings-grid">
           <div class="settings-field full">
-            <label for="s-event-name"> Name (shown at top of page)</label>
+            <label for="s-event-name">Event Name (shown at top of page)</label>
             <input id="s-event-name" type="text" placeholder="e.g. Immersive Theatre Experience" />
           </div>
           <div class="settings-field full">
@@ -1473,8 +1473,8 @@
       }
     }
 
-    $('modal-submit').addListener('click', attemptLogin);
-    $('modal-key').addListener('keydown', e => {
+    $('modal-submit').addEventListener('click', attemptLogin);
+    $('modal-key').addEventListener('keydown', e => {
       if (e.key === 'Enter') attemptLogin();
     });
 

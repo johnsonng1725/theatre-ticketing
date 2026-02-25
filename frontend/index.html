@@ -1145,11 +1145,14 @@
     }
 
     async function loadSettings() {
+      let s = {};
       try {
         const res = await fetch(`${API_BASE}/api/settings`);
-        if (!res.ok) return;
-        const s = await res.json();
-
+        if (res.ok) s = await res.json();
+      } catch (err) {
+        console.warn('Could not load settings, using defaults:', err);
+      }
+      try {
         // ── Header ────────────────────────────────────────────────
         if (s.event_name)        $('hdr-eyebrow').textContent = s.event_name;
         if (s.event_subtitle)    $('hdr-title').textContent   = s.event_subtitle;
