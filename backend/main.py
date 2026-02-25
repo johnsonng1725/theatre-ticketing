@@ -60,6 +60,8 @@ SETTING_DEFAULTS = {
     "duitnow_name":       "YOUR NAME / ORGANISATION",
     "duitnow_id":         "01X-XXX XXXX",
     "duitnow_qr":         "",    # base64 data URL for DuitNow QR image
+    "contact_name":       "",    # name shown in the "if any issue" notice on the booking page
+    "contact_phone":      "",    # phone shown in the "if any issue" notice on the booking page
 }
 
 

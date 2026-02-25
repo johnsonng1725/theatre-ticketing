@@ -440,6 +440,16 @@
     }
     .btn-print:hover { background: rgba(212,175,55,0.1); }
 
+    /* ── Contact notice ──────────────────────────────────────────────── */
+    .contact-notice {
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 1.25rem;
+      line-height: 1.5;
+    }
+    .contact-notice strong { color: var(--text); }
+
     /* ── Print ───────────────────────────────────────────────────────── */
     @media print {
       body { background: #fff; color: #000; padding: 0; }
@@ -599,6 +609,9 @@
         Complete Registration
       </button>
 
+      <!-- Contact notice (shown when contact info is set) -->
+      <p class="contact-notice hidden" id="contact-notice"></p>
+
     </form>
   </div>
 
@@ -620,6 +633,8 @@
       </div>
       <button class="btn-print" onclick="window.print()">Print / Save as PDF</button>
     </div>
+    <!-- Contact notice on ticket confirmation screen -->
+    <p class="contact-notice" id="contact-notice-result"></p>
   </div>
 
   <script src="./config.js"></script>
@@ -1210,6 +1225,17 @@
         if (s.duitnow_qr) {
           const qrImg = $('duitnow-qr-img');
           if (qrImg) qrImg.src = s.duitnow_qr;
+        }
+
+        // ── Contact notice ────────────────────────────────────────
+        const cPhone = (s.contact_phone || '').trim();
+        const cName  = (s.contact_name  || '').trim();
+        if (cPhone) {
+          const html = `If any issue, please contact <strong>${cPhone}</strong>${cName ? ` (${cName})` : ''}`;
+          const n1 = $('contact-notice');
+          const n2 = $('contact-notice-result');
+          if (n1) { n1.innerHTML = html; n1.classList.remove('hidden'); }
+          if (n2) { n2.innerHTML = html; }
         }
 
       } catch (err) {

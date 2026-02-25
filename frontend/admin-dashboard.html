@@ -1231,16 +1231,16 @@
   <div id="settings-modal" class="hidden">
     <div class="settings-modal-box">
       <div class="settings-modal-head">
-        <h3>⚙️ Event Settings</h3>
+        <h3>⚙️  Settings</h3>
         <button onclick="closeSettingsModal()" title="Close">✕</button>
       </div>
 
-      <!-- Event Info -->
+      <!--  Info -->
       <div class="settings-section">
-        <p class="settings-section-title">Event Info</p>
+        <p class="settings-section-title"> Info</p>
         <div class="settings-grid">
           <div class="settings-field full">
-            <label for="s-event-name">Event Name (shown at top of page)</label>
+            <label for="s-event-name"> Name (shown at top of page)</label>
             <input id="s-event-name" type="text" placeholder="e.g. Immersive Theatre Experience" />
           </div>
           <div class="settings-field full">
@@ -1285,7 +1285,7 @@
             <input id="s-duitnow-name" type="text" placeholder="e.g. Jane Doe / XYZ Theatre Co." />
           </div>
           <div class="settings-field">
-            <label for="s-duitnow-id">DuitNow ID (phone / IC / business reg)</label>
+            <label for="s-duitnow-id">DuitNow ID </label>
             <input id="s-duitnow-id" type="text" placeholder="e.g. 012-345 6789" />
           </div>
           <div class="settings-field full">
@@ -1301,6 +1301,22 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Contact Info -->
+      <div class="settings-section">
+        <p class="settings-section-title">Contact Info</p>
+        <div class="settings-grid" style="align-items: end;">
+          <div class="settings-field">
+            <label for="s-contact-name">Contact Name</label>
+            <input id="s-contact-name" type="text" placeholder="e.g. Jane Doe" />
+          </div>
+          <div class="settings-field">
+            <label for="s-contact-phone">Contact Phone</label>
+            <input id="s-contact-phone" type="text" placeholder="e.g. 012-345 6789" />
+          </div>
+        </div>
+        <span class="field-hint">Displayed on the booking page as: "If any issue, please contact 012-345 6789 (Jane Doe)"</span>
       </div>
 
       <p class="settings-modal-error" id="settings-modal-error"></p>
@@ -1457,8 +1473,8 @@
       }
     }
 
-    $('modal-submit').addEventListener('click', attemptLogin);
-    $('modal-key').addEventListener('keydown', e => {
+    $('modal-submit').addListener('click', attemptLogin);
+    $('modal-key').addListener('keydown', e => {
       if (e.key === 'Enter') attemptLogin();
     });
 
@@ -1698,6 +1714,8 @@
       $('s-event-desc').value     = s.event_description || '';
       $('s-duitnow-name').value   = s.duitnow_name      || '';
       $('s-duitnow-id').value     = s.duitnow_id        || '';
+      $('s-contact-name').value   = s.contact_name      || '';
+      $('s-contact-phone').value  = s.contact_phone     || '';
 
       // Populate per-date show date rows
       const dateList = $('s-show-dates-list');
@@ -1848,6 +1866,8 @@
         duitnow_name:      $('s-duitnow-name').value.trim(),
         duitnow_id:        $('s-duitnow-id').value.trim(),
         duitnow_qr:        qrValue,
+        contact_name:      $('s-contact-name').value.trim(),
+        contact_phone:     $('s-contact-phone').value.trim(),
       };
 
       $('btn-save-settings').disabled = true;
