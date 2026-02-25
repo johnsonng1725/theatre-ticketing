@@ -463,21 +463,49 @@ def get_availability(db: Session = Depends(get_db)):
             show_dates = [d.strip() for d in settings["show_dates"].split(",") if d.strip()]
     else:
         show_dates = [d.strip() for d in settings["show_dates"].split(",") if d.strip()]
-    eb_limit        = int(settings["early_bird_limit"])
     total_capacity  = int(settings.get("total_capacity", "100"))
+
+    # Build type definitions from ticket_types_json, or fall back to legacy fields
+    types_json = settings.get("ticket_types_json", "")
+    type_defs: list = []
+    if types_json:
+        try:
+            type_defs = json.loads(types_json)
+        except Exception:
+            pass
+    if not type_defs:
+        type_defs = [
+            {"name": "Early Bird", "limit": settings.get("early_bird_limit", "30")},
+            {"name": "Standard",   "limit": settings.get("standard_limit",   "")},
+        ]
+
     result = {}
     for date in show_dates:
-        eb_sold         = _early_bird_sold(db, date)
         total_sold      = _total_sold(db, date)
-        eb_remaining    = max(0, eb_limit - eb_sold)
         total_remaining = max(0, total_capacity - total_sold)
+
+        # Compute per-type remaining for every type that has a limit set
+        types_data: dict = {}
+        for tdef in type_defs:
+            name    = tdef["name"]
+            lim_str = str(tdef.get("limit", "")).strip()
+            if lim_str:
+                lim  = int(lim_str)
+                sold = _type_sold(db, name, date)
+                types_data[name] = {
+                    "remaining": max(0, lim - sold),
+                    "sold_out":  sold >= lim,
+                }
+
+        # Keep backward-compatible Early Bird top-level fields
+        eb = types_data.get("Early Bird", {})
         result[date] = {
-            "early_bird_sold":      eb_sold,
-            "early_bird_remaining": eb_remaining,
-            "early_bird_sold_out":  eb_sold >= eb_limit,
+            "early_bird_remaining": eb.get("remaining", total_remaining),
+            "early_bird_sold_out":  eb.get("sold_out",  False),
             "total_sold":           total_sold,
             "total_remaining":      total_remaining,
             "total_sold_out":       total_sold >= total_capacity,
+            "types":                types_data,
         }
     return result
 

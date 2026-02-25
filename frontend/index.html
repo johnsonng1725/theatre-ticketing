@@ -795,16 +795,32 @@
             hint.classList.remove('visible');
           }
         } else {
-          // Other types: show total remaining
-          if (remSpan) remSpan.textContent = avail.total_remaining > 0 ? `${avail.total_remaining} left` : '';
-          if (avail.total_sold_out) {
-            btn.classList.add('sold-out');
-            if ($('ticket_type').value === type) {
-              $('ticket_type').value = '';
-              btn.classList.remove('selected');
+          const typeData = avail.types && avail.types[type];
+          if (typeData) {
+            // Per-type limit configured — use it
+            if (typeData.sold_out) {
+              btn.classList.add('sold-out');
+              if (remSpan) remSpan.textContent = '';
+              if ($('ticket_type').value === type) {
+                $('ticket_type').value = '';
+                btn.classList.remove('selected');
+              }
+            } else {
+              btn.classList.remove('sold-out');
+              if (remSpan) remSpan.textContent = `${typeData.remaining} left`;
             }
           } else {
-            btn.classList.remove('sold-out');
+            // No per-type limit — fall back to total venue capacity
+            if (remSpan) remSpan.textContent = avail.total_remaining > 0 ? `${avail.total_remaining} left` : '';
+            if (avail.total_sold_out) {
+              btn.classList.add('sold-out');
+              if ($('ticket_type').value === type) {
+                $('ticket_type').value = '';
+                btn.classList.remove('selected');
+              }
+            } else {
+              btn.classList.remove('sold-out');
+            }
           }
         }
       });
@@ -820,9 +836,17 @@
     function updateQtyMax() {
       const type     = $('ticket_type').value;
       const showDate = $('show_date').value;
+      const avail    = showDate && availability[showDate];
 
-      if (type === 'Early Bird' && showDate && availability[showDate]) {
-        maxQty = availability[showDate].early_bird_remaining;
+      if (avail) {
+        const typeData = avail.types && avail.types[type];
+        if (typeData) {
+          maxQty = typeData.remaining;          // per-type limit (Standard, VIP, etc.)
+        } else if (type === 'Early Bird') {
+          maxQty = avail.early_bird_remaining;  // legacy Early Bird field
+        } else {
+          maxQty = avail.total_remaining;       // no limit → cap at total venue capacity
+        }
       } else {
         maxQty = 10;
       }
@@ -837,8 +861,8 @@
       $('qty-minus').disabled = quantity <= 1;
       $('qty-plus').disabled  = quantity >= maxQty;
 
-      $('qty-max-note').textContent = (type === 'Early Bird' && maxQty < 10)
-        ? `Max ${maxQty} Early Bird ticket(s) remaining for this date`
+      $('qty-max-note').textContent = (type && avail && maxQty < 10)
+        ? `Max ${maxQty} ${type} ticket(s) remaining for this date`
         : '';
     }
 
