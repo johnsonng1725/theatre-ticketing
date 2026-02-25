@@ -479,10 +479,19 @@ def get_availability(db: Session = Depends(get_db)):
             {"name": "Standard",   "limit": settings.get("standard_limit",   "")},
         ]
 
+    # If every defined type has a limit, the effective capacity = sum of those limits.
+    # This ensures the show-date "X seats left" reflects the actual seats on sale,
+    # not the raw total_capacity setting.
+    type_limits = [int(str(t.get("limit", "")).strip()) for t in type_defs if str(t.get("limit", "")).strip()]
+    if len(type_limits) == len(type_defs) and type_limits:
+        effective_capacity = sum(type_limits)
+    else:
+        effective_capacity = total_capacity
+
     result = {}
     for date in show_dates:
         total_sold      = _total_sold(db, date)
-        total_remaining = max(0, total_capacity - total_sold)
+        total_remaining = max(0, effective_capacity - total_sold)
 
         # Compute per-type remaining for every type that has a limit set
         types_data: dict = {}
@@ -504,7 +513,7 @@ def get_availability(db: Session = Depends(get_db)):
             "early_bird_sold_out":  eb.get("sold_out",  False),
             "total_sold":           total_sold,
             "total_remaining":      total_remaining,
-            "total_sold_out":       total_sold >= total_capacity,
+            "total_sold_out":       total_sold >= effective_capacity,
             "types":                types_data,
         }
     return result
