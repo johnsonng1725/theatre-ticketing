@@ -1262,7 +1262,7 @@
 
         // ── Wallpaper ─────────────────────────────────────────────
         if (s.bg_image) {
-          document.body.style.backgroundImage    = `url('${s.bg_image}')`;
+          document.body.style.backgroundImage    = `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('${s.bg_image}')`;
           document.body.style.backgroundSize     = 'cover';
           document.body.style.backgroundPosition = 'center';
           document.body.style.backgroundAttachment = 'fixed';
