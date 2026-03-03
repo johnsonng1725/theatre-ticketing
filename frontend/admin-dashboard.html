@@ -732,6 +732,28 @@
       cursor: pointer;
     }
     .btn-remove-qr:hover { background: rgba(239,68,68,0.1); }
+    .btn-upload-secondary {
+      display: inline-block;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 0.5rem 1rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .btn-upload-secondary:hover { border-color: var(--gold); }
+    .btn-remove-secondary {
+      background: transparent;
+      border: 1px solid rgba(239,68,68,0.3);
+      color: var(--error);
+      border-radius: 6px;
+      padding: 0.3rem 0.65rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .btn-remove-secondary:hover { background: rgba(239,68,68,0.1); }
 
     /* ── Edit button ────────────────────────────────────────── */
     .btn-edit {
@@ -1303,6 +1325,42 @@
         </div>
       </div>
 
+      <!-- Appearance -->
+      <div class="settings-section">
+        <p class="settings-section-title">Appearance (Register Form)</p>
+
+        <!-- Wallpaper -->
+        <div class="settings-field full">
+          <label>Wallpaper Image</label>
+          <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; margin-top:0.35rem;">
+            <button type="button" class="btn-upload-secondary"
+                    onclick="document.getElementById('s-bg-file').click()">Upload Image</button>
+            <button type="button" class="btn-remove-secondary" id="btn-remove-bg"
+                    style="display:none" onclick="removeBgImage()">Remove</button>
+          </div>
+          <input type="file" id="s-bg-file" accept="image/*" style="display:none"
+                 onchange="handleBgUpload(this)">
+          <img id="s-bg-preview" style="display:none; margin-top:0.5rem;
+               max-height:120px; border-radius:8px; border:1px solid var(--border);" alt="Wallpaper preview" />
+          <span class="field-hint">Replaces the black background on the booking page (cover / crops edges).</span>
+        </div>
+
+        <!-- Font -->
+        <div class="settings-field full" style="margin-top:1rem;">
+          <label>Custom Font</label>
+          <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; margin-top:0.35rem;">
+            <button type="button" class="btn-upload-secondary"
+                    onclick="document.getElementById('s-font-file').click()">Upload Font (.otf / .ttf)</button>
+            <span id="s-font-filename" style="font-size:0.8rem; color:var(--text-muted);"></span>
+            <button type="button" class="btn-remove-secondary" id="btn-remove-font"
+                    style="display:none" onclick="removeFontFile()">Remove</button>
+          </div>
+          <input type="file" id="s-font-file" accept=".otf,.ttf,.woff,.woff2"
+                 style="display:none" onchange="handleFontUpload(this)">
+          <span class="field-hint">Applied to all text on the booking page.</span>
+        </div>
+      </div>
+
       <!-- Contact Info -->
       <div class="settings-section">
         <p class="settings-section-title">Contact Info</p>
@@ -1746,6 +1804,29 @@
         btnRemoveQr.classList.add('hidden');
       }
 
+      // Wallpaper preview
+      window._currentBgDataUrl = s.bg_image || null;
+      window._pendingBgDataUrl  = null;
+      if (window._currentBgDataUrl) {
+        $('s-bg-preview').src = window._currentBgDataUrl;
+        $('s-bg-preview').style.display = 'block';
+        $('btn-remove-bg').style.display = 'inline-block';
+      } else {
+        $('s-bg-preview').style.display = 'none';
+        $('btn-remove-bg').style.display = 'none';
+      }
+
+      // Font
+      window._currentFontDataUrl = s.custom_font || null;
+      window._pendingFontDataUrl  = null;
+      if (window._currentFontDataUrl) {
+        $('s-font-filename').textContent = 'Custom font loaded';
+        $('btn-remove-font').style.display = 'inline-block';
+      } else {
+        $('s-font-filename').textContent = '';
+        $('btn-remove-font').style.display = 'none';
+      }
+
       // Populate dynamic ticket type rows
       const list = $('s-ticket-types-list');
       list.innerHTML = '';
@@ -1804,6 +1885,54 @@
       $('s-duitnow-qr-file').value = '';
     }
 
+    // ── Appearance: wallpaper ────────────────────────────────
+    function handleBgUpload(input) {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        window._pendingBgDataUrl = e.target.result;
+        const preview = $('s-bg-preview');
+        preview.src = window._pendingBgDataUrl;
+        preview.style.display = 'block';
+        $('btn-remove-bg').style.display = 'inline-block';
+      };
+      reader.readAsDataURL(file);
+      input.value = '';
+    }
+
+    function removeBgImage() {
+      window._pendingBgDataUrl = '';
+      window._currentBgDataUrl = null;
+      const preview = $('s-bg-preview');
+      preview.src = '';
+      preview.style.display = 'none';
+      $('btn-remove-bg').style.display = 'none';
+    }
+
+    // ── Appearance: font ─────────────────────────────────────
+    function handleFontUpload(input) {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        window._pendingFontDataUrl = e.target.result;
+        window._pendingFontName    = file.name;
+        $('s-font-filename').textContent = file.name;
+        $('btn-remove-font').style.display = 'inline-block';
+      };
+      reader.readAsDataURL(file);
+      input.value = '';
+    }
+
+    function removeFontFile() {
+      window._pendingFontDataUrl = '';
+      window._currentFontDataUrl = null;
+      window._pendingFontName    = null;
+      $('s-font-filename').textContent = '';
+      $('btn-remove-font').style.display = 'none';
+    }
+
     function addTicketTypeRow(t = {}) {
       const row = document.createElement('div');
       row.className = 'ticket-type-row';
@@ -1855,6 +1984,14 @@
         ? window._pendingQrDataUrl
         : (window._currentQrDataUrl || '');
 
+      const bgValue = (window._pendingBgDataUrl !== null && window._pendingBgDataUrl !== undefined)
+        ? window._pendingBgDataUrl
+        : (window._currentBgDataUrl || '');
+
+      const fontValue = (window._pendingFontDataUrl !== null && window._pendingFontDataUrl !== undefined)
+        ? window._pendingFontDataUrl
+        : (window._currentFontDataUrl || '');
+
       const payload = {
         event_name:        $('s-event-name').value.trim(),
         event_subtitle:    $('s-event-subtitle').value.trim(),
@@ -1866,6 +2003,8 @@
         duitnow_name:      $('s-duitnow-name').value.trim(),
         duitnow_id:        $('s-duitnow-id').value.trim(),
         duitnow_qr:        qrValue,
+        bg_image:          bgValue,
+        custom_font:       fontValue,
         contact_name:      $('s-contact-name').value.trim(),
         contact_phone:     $('s-contact-phone').value.trim(),
       };

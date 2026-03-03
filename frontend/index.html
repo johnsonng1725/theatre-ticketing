@@ -1260,6 +1260,29 @@
           if (qrImg) qrImg.src = s.duitnow_qr;
         }
 
+        // ── Wallpaper ─────────────────────────────────────────────
+        if (s.bg_image) {
+          document.body.style.backgroundImage    = `url('${s.bg_image}')`;
+          document.body.style.backgroundSize     = 'cover';
+          document.body.style.backgroundPosition = 'center';
+          document.body.style.backgroundAttachment = 'fixed';
+        } else {
+          document.body.style.backgroundImage = '';
+        }
+
+        // ── Custom font ───────────────────────────────────────────
+        if (s.custom_font) {
+          const existing = document.getElementById('custom-font-style');
+          if (existing) existing.remove();
+          const style = document.createElement('style');
+          style.id = 'custom-font-style';
+          style.textContent = `@font-face { font-family: 'CustomFont'; src: url('${s.custom_font}'); }`;
+          document.head.appendChild(style);
+          document.body.style.fontFamily = "'CustomFont', 'Segoe UI', system-ui, sans-serif";
+        } else {
+          document.body.style.fontFamily = '';
+        }
+
         // ── Contact notice ────────────────────────────────────────
         const cPhone = (s.contact_phone || '').trim();
         const cName  = (s.contact_name  || '').trim();
