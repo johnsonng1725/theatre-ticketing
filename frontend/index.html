@@ -10,7 +10,7 @@
   <style>
     /* ── Design tokens ───────────────────────────────────────────────── */
     :root {
-      --bg:        #0a0a0f;
+      --bg:        #000000;
       --surface:   #12121e;
       --card:      #1a1a2e;
       --border:    #2a2a45;
@@ -686,9 +686,15 @@
     }
 
     // ── Availability ─────────────────────────────────────────────────
+    function fetchWithTimeout(url, ms) {
+      const ctrl = new AbortController();
+      const tid  = setTimeout(() => ctrl.abort(), ms);
+      return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(tid));
+    }
+
     async function fetchAvailability() {
       try {
-        const res = await fetch(`${API_BASE}/api/availability`);
+        const res = await fetchWithTimeout(`${API_BASE}/api/availability`, 6000);
         if (res.ok) {
           availability = await res.json();
           updateShowDateButtons();
@@ -1171,7 +1177,7 @@
     async function loadSettings() {
       let s = {};
       try {
-        const res = await fetch(`${API_BASE}/api/settings`);
+        const res = await fetchWithTimeout(`${API_BASE}/api/settings`, 6000);
         if (res.ok) s = await res.json();
       } catch (err) {
         console.warn('Could not load settings, using defaults:', err);
@@ -1271,7 +1277,14 @@
     }
 
     // ── Init ─────────────────────────────────────────────────────────
-    loadSettings().then(() => fetchAvailability());
+    loadSettings().then(() => {
+      fetchAvailability();
+      // Retry until availability data arrives — handles Render cold start (1-2 min wake-up)
+      const poll = setInterval(async () => {
+        if (Object.keys(availability).length > 0) { clearInterval(poll); return; }
+        await fetchAvailability();
+      }, 10000);
+    });
   </script>
 </body>
 </html>
