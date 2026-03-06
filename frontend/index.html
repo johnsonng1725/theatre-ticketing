@@ -1186,37 +1186,25 @@
       });
     }
 
-    async function loadSettings() {
-      let s = {};
-      try {
-        const res = await fetchWithTimeout(`${API_BASE}/api/settings`, 6000);
-        if (res.ok) s = await res.json();
-      } catch (err) {
-        console.warn('Could not load settings, using defaults:', err);
-      }
+    // Apply a settings object to the page — called instantly from cache, then again with fresh data
+    function applySettings(s) {
       try {
         // ── Header ────────────────────────────────────────────────
         if (s.event_name)        $('hdr-eyebrow').textContent = s.event_name;
         if (s.event_subtitle)    $('hdr-title').textContent   = s.event_subtitle;
         if (s.event_description) $('hdr-desc').textContent    = s.event_description;
 
-        // ── Prices ────────────────────────────────────────────────
         // ── Ticket types (dynamic) ────────────────────────────────
         let ticketTypes = [];
         try { ticketTypes = JSON.parse(s.ticket_types_json || '[]'); } catch {}
         if (!ticketTypes.length) {
-          // Fall back to legacy fields
           ticketTypes = [
             { name: 'Early Bird', price: s.early_bird_price || '25', limit: s.early_bird_limit || '' },
             { name: 'Standard',   price: s.standard_price   || '30', limit: s.standard_limit   || '' },
           ];
         }
-
-        // Rebuild PRICES map
         PRICES = {};
         ticketTypes.forEach(t => { PRICES[t.name] = parseInt(t.price, 10) || 0; });
-
-        // Rebuild ticket type buttons
         const typeGrid = $('ticket-type-grid');
         typeGrid.innerHTML = '';
         ticketTypes.forEach(t => {
@@ -1234,7 +1222,6 @@
         });
 
         // ── Show dates ────────────────────────────────────────────
-        // Use show_dates_json for per-date times; fall back to legacy fields
         let dateDefs = [];
         try { dateDefs = JSON.parse(s.show_dates_json || '[]'); } catch {}
         if (!dateDefs.length) {
@@ -1270,7 +1257,6 @@
         // ── DuitNow info ──────────────────────────────────────────
         if (s.duitnow_name) $('duitnow-name').textContent = s.duitnow_name;
         if (s.duitnow_id)   $('duitnow-id').textContent   = s.duitnow_id;
-        // Use uploaded QR image if available, otherwise keep the static fallback
         if (s.duitnow_qr) {
           const qrImg = $('duitnow-qr-img');
           if (qrImg) qrImg.src = s.duitnow_qr;
@@ -1309,9 +1295,30 @@
           if (n1) { n1.innerHTML = html; n1.classList.remove('hidden'); }
           if (n2) { n2.innerHTML = html; }
         }
-
       } catch (err) {
-        console.warn('Could not load settings, using defaults:', err);
+        console.warn('applySettings error:', err);
+      }
+    }
+
+    async function loadSettings() {
+      // ① Apply cached settings instantly — eliminates flash of default content
+      try {
+        const cached = localStorage.getItem('theatre_settings');
+        if (cached) applySettings(JSON.parse(cached));
+      } catch {}
+
+      // ② Fetch fresh settings from backend
+      let fresh = null;
+      try {
+        const res = await fetchWithTimeout(`${API_BASE}/api/settings`, 6000);
+        if (res.ok) fresh = await res.json();
+      } catch (err) {
+        console.warn('Could not load settings:', err);
+      }
+
+      if (fresh) {
+        try { localStorage.setItem('theatre_settings', JSON.stringify(fresh)); } catch {}
+        applySettings(fresh);
       }
     }
 
