@@ -37,6 +37,8 @@
       flex-direction: column;
       align-items: center;
       padding: 2rem 1rem 4rem;
+      opacity: 0;
+      transition: opacity 0.3s ease;
     }
 
     /* ── Header ──────────────────────────────────────────────────────── */
@@ -1298,6 +1300,8 @@
       } catch (err) {
         console.warn('applySettings error:', err);
       }
+      // Reveal page — never show default HTML, only the designed content
+      document.body.style.opacity = '1';
     }
 
     async function loadSettings() {
@@ -1323,6 +1327,9 @@
     }
 
     // ── Init ─────────────────────────────────────────────────────────
+    // Safety: always show the page within 1s even if all fetches fail
+    setTimeout(() => { document.body.style.opacity = '1'; }, 1000);
+
     loadSettings().then(() => {
       fetchAvailability();
 
