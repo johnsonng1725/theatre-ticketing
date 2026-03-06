@@ -225,6 +225,18 @@
       white-space: nowrap;
     }
     .show-date-btn.sold-out .sdb-soldout-badge { display: inline-block; }
+    .sdb-loading {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      text-align: center;
+      padding: 1rem 0;
+      grid-column: 1 / -1;
+      animation: sdb-pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes sdb-pulse {
+      0%, 100% { opacity: 0.4; }
+      50%       { opacity: 1; }
+    }
 
     /* ── Sold-out hint ───────────────────────────────────────────────── */
     .sold-out-hint { font-size: 0.78rem; color: var(--error); margin-top: 0.2rem; display: none; }
@@ -1232,24 +1244,28 @@
         }
         const grid = $('show-date-grid');
         grid.innerHTML = '';
-        dateDefs.forEach(({ date: iso, time: showTime }) => {
-          if (!iso) return;
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = 'show-date-btn';
-          btn.dataset.iso = iso;
-          btn.addEventListener('click', () => selectShowDate(iso));
-          btn.innerHTML = `
-            <span class="sdb-left">
-              <span class="sdb-date">${formatShowDateLabel(iso)}</span>
-              ${showTime ? `<span class="sdb-time">${showTime}</span>` : ''}
-            </span>
-            <span class="sdb-right">
-              <span class="sdb-remaining"></span>
-              <span class="sdb-soldout-badge">Sold Out</span>
-            </span>`;
-          grid.appendChild(btn);
-        });
+        if (dateDefs.length) {
+          dateDefs.forEach(({ date: iso, time: showTime }) => {
+            if (!iso) return;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'show-date-btn';
+            btn.dataset.iso = iso;
+            btn.addEventListener('click', () => selectShowDate(iso));
+            btn.innerHTML = `
+              <span class="sdb-left">
+                <span class="sdb-date">${formatShowDateLabel(iso)}</span>
+                ${showTime ? `<span class="sdb-time">${showTime}</span>` : ''}
+              </span>
+              <span class="sdb-right">
+                <span class="sdb-remaining"></span>
+                <span class="sdb-soldout-badge">Sold Out</span>
+              </span>`;
+            grid.appendChild(btn);
+          });
+        } else {
+          grid.innerHTML = '<p class="sdb-loading">Loading show dates…</p>';
+        }
 
         // ── DuitNow info ──────────────────────────────────────────
         if (s.duitnow_name) $('duitnow-name').textContent = s.duitnow_name;
@@ -1302,9 +1318,18 @@
     // ── Init ─────────────────────────────────────────────────────────
     loadSettings().then(() => {
       fetchAvailability();
-      // Retry until availability data arrives — handles Render cold start (1-2 min wake-up)
-      const poll = setInterval(async () => {
-        if (Object.keys(availability).length > 0) { clearInterval(poll); return; }
+
+      // Retry loadSettings() until show dates appear — handles Render cold start
+      const settingsPoll = setInterval(async () => {
+        const grid = $('show-date-grid');
+        if (grid && grid.querySelector('.show-date-btn')) { clearInterval(settingsPoll); return; }
+        await loadSettings();
+        if (grid && grid.querySelector('.show-date-btn')) fetchAvailability();
+      }, 8000);
+
+      // Retry until availability data arrives
+      const availPoll = setInterval(async () => {
+        if (Object.keys(availability).length > 0) { clearInterval(availPoll); return; }
         await fetchAvailability();
       }, 10000);
     });
