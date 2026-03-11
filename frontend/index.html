@@ -494,7 +494,7 @@
 
   <header>
     <p class="eyebrow" id="hdr-eyebrow"></p>
-    <p id="hdr-presenter" style="font-size:0.75rem;color:#8888aa;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:0.75rem;display:none;"></p>
+    <p id="hdr-presenter" style="font-size:0.75rem;color:#8888aa;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:0.75rem;">Presented by MCKL</p>
     <h1 id="hdr-title"></h1>
     <p id="hdr-desc"></p>
   </header>
@@ -1220,8 +1220,8 @@
         if (s.event_subtitle)    $('hdr-title').textContent   = s.event_subtitle;
         if (s.event_description) $('hdr-desc').textContent    = s.event_description;
         const presEl = $('hdr-presenter');
-        if (presEl) {
-          presEl.textContent   = s.event_presenter || '';
+        if (presEl && s.event_presenter !== undefined) {
+          presEl.textContent   = s.event_presenter;
           presEl.style.display = s.event_presenter ? '' : 'none';
         }
 
