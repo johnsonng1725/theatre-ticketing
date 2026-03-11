@@ -1266,6 +1266,10 @@
             <input id="s-event-name" type="text" placeholder="e.g. Immersive Theatre Experience" />
           </div>
           <div class="settings-field full">
+            <label for="s-event-presenter">Presenter Line (below event name)</label>
+            <input id="s-event-presenter" type="text" placeholder="e.g. Presented by MCKL" />
+          </div>
+          <div class="settings-field full">
             <label for="s-event-subtitle">Page Title (big heading)</label>
             <input id="s-event-subtitle" type="text" placeholder="e.g. Reserve Your Place" />
           </div>
@@ -1767,9 +1771,10 @@
         s = res.ok ? await res.json() : {};
       } catch {}
 
-      $('s-event-name').value     = s.event_name        || '';
-      $('s-event-subtitle').value = s.event_subtitle    || '';
-      $('s-event-desc').value     = s.event_description || '';
+      $('s-event-name').value      = s.event_name        || '';
+      $('s-event-presenter').value = s.event_presenter  || '';
+      $('s-event-subtitle').value  = s.event_subtitle   || '';
+      $('s-event-desc').value      = s.event_description || '';
       $('s-duitnow-name').value   = s.duitnow_name      || '';
       $('s-duitnow-id').value     = s.duitnow_id        || '';
       $('s-contact-name').value   = s.contact_name      || '';
@@ -1994,6 +1999,7 @@
 
       const payload = {
         event_name:        $('s-event-name').value.trim(),
+        event_presenter:   $('s-event-presenter').value.trim(),
         event_subtitle:    $('s-event-subtitle').value.trim(),
         event_description: $('s-event-desc').value.trim(),
         show_dates_json:   JSON.stringify(showDates),
