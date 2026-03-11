@@ -37,8 +37,6 @@
       flex-direction: column;
       align-items: center;
       padding: 2rem 1rem 4rem;
-      opacity: 0;
-      transition: opacity 0.3s ease;
     }
 
     /* ── Header ──────────────────────────────────────────────────────── */
@@ -192,6 +190,7 @@
       opacity: 0.55;
       cursor: not-allowed;
       background: rgba(255,255,255,0.02);
+      pointer-events: none;
     }
     .sdb-left  { display: flex; flex-direction: column; gap: 0.15rem; }
     .sdb-time  { font-size: 0.75rem; color: var(--text-muted); font-weight: 400; }
@@ -479,14 +478,24 @@
       .card { padding: 1.5rem 1.25rem; }
       .ticket-details { grid-template-columns: 1fr; }
     }
+
+    /* ── Page loader overlay ─────────────────────────────────────────── */
+    #page-loader {
+      position: fixed; inset: 0;
+      background: #000000;
+      z-index: 9999;
+    }
+    #page-loader.hidden { display: none; }
   </style>
 </head>
 <body>
 
+  <div id="page-loader" style="position:fixed;inset:0;background:#000;z-index:9999;"></div>
+
   <header>
-    <p class="eyebrow" id="hdr-eyebrow">Immersive Theatre Experience</p>
-    <h1 id="hdr-title">Reserve Your Place</h1>
-    <p id="hdr-desc">Complete the form, pay, and upload your receipt to confirm your booking.</p>
+    <p class="eyebrow" id="hdr-eyebrow"></p>
+    <h1 id="hdr-title"></h1>
+    <p id="hdr-desc"></p>
   </header>
 
   <div class="card" id="registration-form">
@@ -570,8 +579,8 @@
             <img id="duitnow-qr-img" src="./duitnow-qr.png" alt="DuitNow QR Code" />
 
             <p class="duitnow-account">
-              <strong id="duitnow-name">YOUR NAME / ORGANISATION</strong><br/>
-              DuitNow ID: <span id="duitnow-id">01X-XXX XXXX</span>
+              <strong id="duitnow-name"></strong><br/>
+              DuitNow ID: <span id="duitnow-id"></span>
             </p>
           </div>
         </div>
@@ -719,10 +728,18 @@
       }
     }
 
+    // Looks up availability for a slot key.
+    // Tries the composite key first ("2026-04-11||14:00-16:30"), then falls back
+    // to the date-only portion ("2026-04-11") so the page still works while the
+    // backend has not yet been deployed with the composite-key update.
+    function slotAvail(key) {
+      return availability[key] ?? availability[key.split('||')[0]] ?? null;
+    }
+
     // ── Show date button selection ────────────────────────────────────
-    function selectShowDate(iso) {
-      const btn = document.querySelector(`.show-date-btn[data-iso="${iso}"]`);
-      if (btn && btn.classList.contains('sold-out')) return;
+    function selectShowDate(iso, targetBtn) {
+      const btn = targetBtn || document.querySelector(`.show-date-btn[data-iso="${iso}"]`);
+      if (!btn || btn.classList.contains('sold-out')) return;
 
       $('show_date').value = iso;
 
@@ -737,7 +754,7 @@
     function updateShowDateButtons() {
       document.querySelectorAll('.show-date-btn').forEach(btn => {
         const iso   = btn.dataset.iso;
-        const data  = availability[iso];
+        const data  = slotAvail(iso);
         const remEl = btn.querySelector('.sdb-remaining');
 
         if (!data) {
@@ -786,7 +803,7 @@
     function updateEarlyBirdOption(showDate) {
       // Update all ticket type buttons based on availability
       const hint = $('early-bird-hint');
-      const avail = showDate && availability[showDate];
+      const avail = showDate && slotAvail(showDate);
 
       document.querySelectorAll('.ticket-type-btn').forEach(btn => {
         const type    = btn.dataset.type;
@@ -856,7 +873,7 @@
     function updateQtyMax() {
       const type     = $('ticket_type').value;
       const showDate = $('show_date').value;
-      const avail    = showDate && availability[showDate];
+      const avail    = showDate && slotAvail(showDate);
 
       if (avail) {
         const typeData = avail.types && avail.types[type];
@@ -927,8 +944,8 @@
       const showDate = $('show_date').value;
 
       const soldOut = type === 'Early Bird' &&
-                      showDate && availability[showDate] &&
-                      availability[showDate].early_bird_sold_out;
+                      showDate && slotAvail(showDate) &&
+                      slotAvail(showDate).early_bird_sold_out;
 
       if (type && showDate && !soldOut) {
         $('payment-section').classList.add('visible');
@@ -944,8 +961,8 @@
       const showDate = $('show_date').value;
 
       const soldOut = type === 'Early Bird' &&
-                      showDate && availability[showDate] &&
-                      availability[showDate].early_bird_sold_out;
+                      showDate && slotAvail(showDate) &&
+                      slotAvail(showDate).early_bird_sold_out;
 
       if (soldOut) {
         btn.disabled = true;
@@ -1087,7 +1104,7 @@
       }
 
       // Final sold-out guard
-      if (ticketType === 'Early Bird' && availability[showDate]?.early_bird_sold_out) {
+      if (ticketType === 'Early Bird' && slotAvail(showDate)?.early_bird_sold_out) {
         showError('Early Bird tickets are sold out for this date. Please select Standard.');
         return;
       }
@@ -1104,7 +1121,7 @@
           body: JSON.stringify({
             name, email, phone,
             ticket_type:      ticketType,
-            show_date:        showDate,
+            show_date:        showDate.split('||')[0],
             quantity:         quantity,
             receipt_data:     receiptBase64,
             receipt_filename: receiptName,
@@ -1173,16 +1190,21 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    function formatDate(iso) {
-      const d = new Date(iso + 'T00:00:00');
-      return d.toLocaleDateString('en-GB', {
+    function formatDate(slotKey) {
+      const parts    = slotKey.split('||');
+      const datePart = parts[0];
+      const timePart = parts[1] || '';
+      const d = new Date(datePart + 'T00:00:00');
+      const dateLabel = d.toLocaleDateString('en-GB', {
         weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
       });
+      return timePart ? `${dateLabel}, ${timePart}` : dateLabel;
     }
 
     // ── Settings loader ──────────────────────────────────────────────
-    function formatShowDateLabel(iso) {
-      const d = new Date(iso + 'T00:00:00');
+    function formatShowDateLabel(slotKey) {
+      const datePart = slotKey.split('||')[0];
+      const d = new Date(datePart + 'T00:00:00');
       return d.toLocaleDateString('en-GB', {
         weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
       });
@@ -1236,14 +1258,18 @@
         if (dateDefs.length) {
           dateDefs.forEach(({ date: iso, time: showTime }) => {
             if (!iso) return;
+            // Composite slot key — must match what /api/availability returns
+            const slotKey = (showTime && showTime.trim())
+              ? (iso + '||' + showTime.trim())
+              : iso;
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'show-date-btn';
-            btn.dataset.iso = iso;
-            btn.addEventListener('click', () => selectShowDate(iso));
+            btn.dataset.iso = slotKey;
+            btn.addEventListener('click', () => selectShowDate(slotKey, btn));
             btn.innerHTML = `
               <span class="sdb-left">
-                <span class="sdb-date">${formatShowDateLabel(iso)}</span>
+                <span class="sdb-date">${formatShowDateLabel(slotKey)}</span>
                 ${showTime ? `<span class="sdb-time">${showTime}</span>` : ''}
               </span>
               <span class="sdb-right">
@@ -1300,15 +1326,21 @@
       } catch (err) {
         console.warn('applySettings error:', err);
       }
-      // Reveal page — never show default HTML, only the designed content
-      document.body.style.opacity = '1';
+      // Hide loading overlay — reveal designed page
+      const loader = document.getElementById('page-loader');
+      if (loader) loader.classList.add('hidden');
     }
 
     async function loadSettings() {
+      let hadCache = false;
+
       // ① Apply cached settings instantly — eliminates flash of default content
       try {
         const cached = localStorage.getItem('theatre_settings');
-        if (cached) applySettings(JSON.parse(cached));
+        if (cached) {
+          hadCache = true;
+          applySettings(JSON.parse(cached));
+        }
       } catch {}
 
       // ② Fetch fresh settings from backend
@@ -1324,11 +1356,22 @@
         try { localStorage.setItem('theatre_settings', JSON.stringify(fresh)); } catch {}
         applySettings(fresh);
       }
+
+      // Only hide loader if we had data to show.
+      // If no cache AND backend timed out, keep loader black — settingsPoll will retry.
+      if (hadCache || fresh) {
+        const loader = document.getElementById('page-loader');
+        if (loader) loader.classList.add('hidden');
+      }
     }
 
     // ── Init ─────────────────────────────────────────────────────────
-    // Safety: always show the page within 1s even if all fetches fail
-    setTimeout(() => { document.body.style.opacity = '1'; }, 1000);
+    // Hard fallback: force-hide loader after 25 s — prevents infinite black screen
+    // if backend is completely unreachable and there is no local cache.
+    setTimeout(() => {
+      const loader = document.getElementById('page-loader');
+      if (loader) loader.classList.add('hidden');
+    }, 25000);
 
     loadSettings().then(() => {
       fetchAvailability();
