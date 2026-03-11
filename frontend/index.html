@@ -1137,7 +1137,7 @@
           return;
         }
 
-        renderTicket(data);
+        renderTicket({ ...data, show_date: showDate });
         showSuccess('Registration confirmed! Please save or print your ticket.');
         $('reg-form').reset();
         receiptBase64 = null;
