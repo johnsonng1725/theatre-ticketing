@@ -22,7 +22,7 @@ class Ticket(Base):
     email            = Column(String(255), nullable=False, index=True)
     phone            = Column(String(20),  nullable=False)
     ticket_type      = Column(String(50),  nullable=False)
-    show_date        = Column(String(20),  nullable=False)
+    show_date        = Column(String(100), nullable=False)
     quantity         = Column(Integer,     default=1, nullable=False)
     # Receipt stored as base64 data URI — sufficient for small-scale events
     receipt_data     = Column(Text,        nullable=True)

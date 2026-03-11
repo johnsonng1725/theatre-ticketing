@@ -19,11 +19,33 @@ from database import get_db, engine
 import models
 import schemas
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
 # Create tables on startup
 models.Base.metadata.create_all(bind=engine)
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+def _migrate_show_date_column():
+    """Widen tickets.show_date to VARCHAR(100) for composite slot keys like
+    '2026-04-11||14:00-16:30'. Idempotent — checks width before altering."""
+    from sqlalchemy import text
+    try:
+        with engine.connect() as conn:
+            if engine.dialect.name == "postgresql":
+                row = conn.execute(text(
+                    "SELECT character_maximum_length FROM information_schema.columns "
+                    "WHERE table_name='tickets' AND column_name='show_date'"
+                )).fetchone()
+                if row and row[0] is not None and row[0] < 100:
+                    conn.execute(text(
+                        "ALTER TABLE tickets ALTER COLUMN show_date TYPE VARCHAR(100)"
+                    ))
+                    conn.commit()
+                    logger.info("DB migration: widened tickets.show_date to VARCHAR(100)")
+    except Exception as exc:
+        logger.error("DB migration failed (non-fatal): %s", exc)
+
+_migrate_show_date_column()
 
 DASHBOARD_KEY    = os.environ.get("DASHBOARD_KEY",  "admin321")
 FINANCE_KEY      = os.environ.get("FINANCE_KEY",    "finance123")
@@ -100,10 +122,16 @@ def _generate_qr_png_bytes(ticket_id: str) -> bytes:
 
 
 def _format_date(iso_date: str) -> str:
-    """Convert '2026-04-19' → 'Sunday, 19 April 2026, 4.00pm-6.30pm'."""
+    """Convert a slot key like '2026-04-19' or '2026-04-19||14:00-16:30'
+    to a human-readable string like 'Sunday, 19 April 2026' or
+    'Sunday, 19 April 2026, 14:00-16:30'."""
     try:
-        d = date.fromisoformat(iso_date)
-        return d.strftime("%A, %-d %B %Y")
+        parts     = iso_date.split("||", 1)
+        date_part = parts[0].strip()
+        time_part = parts[1].strip() if len(parts) > 1 else ""
+        d         = date.fromisoformat(date_part)
+        label     = d.strftime("%A, %-d %B %Y")
+        return f"{label}, {time_part}" if time_part else label
     except Exception:
         return iso_date
 
@@ -455,16 +483,29 @@ def _total_sold(db: Session, show_date: str) -> int:
 def get_availability(db: Session = Depends(get_db)):
     """Public — returns Early Bird and total capacity info per show date."""
     settings = get_all_settings(db)
-    # Prefer show_dates_json (per-date rows) over legacy comma-separated show_dates
+    # Build (slot_key, date_part) pairs — slot_key includes time when present
+    # so that two time slots on the same calendar day get separate availability buckets.
+    slot_defs: list = []   # list of (slot_key, date_part) tuples
     _sdj = settings.get("show_dates_json", "")
     if _sdj:
         try:
-            _date_defs = json.loads(_sdj)
-            show_dates = [d["date"].strip() for d in _date_defs if d.get("date", "").strip()]
+            for entry in json.loads(_sdj):
+                date_part = entry.get("date", "").strip()
+                if not date_part:
+                    continue
+                time_part = entry.get("time", "").strip()
+                slot_key  = f"{date_part}||{time_part}" if time_part else date_part
+                slot_defs.append((slot_key, date_part))
         except Exception:
-            show_dates = [d.strip() for d in settings["show_dates"].split(",") if d.strip()]
+            for d in settings["show_dates"].split(","):
+                d = d.strip()
+                if d:
+                    slot_defs.append((d, d))
     else:
-        show_dates = [d.strip() for d in settings["show_dates"].split(",") if d.strip()]
+        for d in settings["show_dates"].split(","):
+            d = d.strip()
+            if d:
+                slot_defs.append((d, d))
     total_capacity  = int(settings.get("total_capacity", "100"))
 
     # Build type definitions from ticket_types_json, or fall back to legacy fields
@@ -491,8 +532,8 @@ def get_availability(db: Session = Depends(get_db)):
         effective_capacity = total_capacity
 
     result = {}
-    for date in show_dates:
-        total_sold      = _total_sold(db, date)
+    for slot_key, _date_part in slot_defs:
+        total_sold      = _total_sold(db, slot_key)
         total_remaining = max(0, effective_capacity - total_sold)
 
         # Compute per-type remaining for every type that has a limit set
@@ -502,7 +543,7 @@ def get_availability(db: Session = Depends(get_db)):
             lim_str = str(tdef.get("limit", "")).strip()
             if lim_str:
                 lim  = int(lim_str)
-                sold = _type_sold(db, name, date)
+                sold = _type_sold(db, name, slot_key)
                 types_data[name] = {
                     "remaining": max(0, lim - sold),
                     "sold_out":  sold >= lim,
@@ -510,7 +551,7 @@ def get_availability(db: Session = Depends(get_db)):
 
         # Keep backward-compatible Early Bird top-level fields
         eb = types_data.get("Early Bird", {})
-        result[date] = {
+        result[slot_key] = {
             "early_bird_remaining": eb.get("remaining", total_remaining),
             "early_bird_sold_out":  eb.get("sold_out",  False),
             "total_sold":           total_sold,
