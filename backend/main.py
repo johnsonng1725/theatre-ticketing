@@ -68,7 +68,7 @@ BREVO_FROM_NAME  = os.environ.get("BREVO_FROM_NAME",  "Theatre Booking")
 # These are used when no override exists in the database.
 SETTING_DEFAULTS = {
     "event_name":         "Immersive Theatre Experience",
-    "event_presenter":    "",
+    "event_presenter":    "Presented by MCKL",
     "event_subtitle":     "Reserve Your Place",
     "event_description":  "Complete the form, pay, and upload your receipt to confirm your booking.",
     "show_dates":         "2026-04-19,2026-04-26",   # comma-separated ISO dates
