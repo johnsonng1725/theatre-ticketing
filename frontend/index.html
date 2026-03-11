@@ -1128,10 +1128,11 @@
           })
         });
 
-        const data = await res.json();
+        let data;
+        try { data = await res.json(); } catch { data = null; }
 
         if (!res.ok) {
-          showError(parseApiError(data));
+          showError(data ? parseApiError(data) : `Server error (${res.status}) — please try again.`);
           if (ticketType === 'Early Bird') await fetchAvailability();
           return;
         }
